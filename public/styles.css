@@ -214,29 +214,14 @@ body.sidebar-open {
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
   text-decoration: none;
-  color: var(--text-dark);
 }
 
-.logo-icon-box {
-  width: 40px;
-  height: 40px;
-  background-color: var(--primary-green-light);
-  border: 1px solid var(--primary-green-border);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary-green);
-}
-
-.logo-icon-box svg { width: 22px; height: 22px; }
-
-.logo-text {
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+.sidebar-logo-img {
+  height: 52px;
+  width: auto;
+  max-width: 180px;
+  object-fit: contain;
 }
 
 .menu-group {
