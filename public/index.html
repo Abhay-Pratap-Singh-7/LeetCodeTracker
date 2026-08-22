@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeetDash &bull; LeetCode Team Analytics</title>
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="donezo-theme">
+
+  <!-- Mobile & Small Device Alert Overlay -->
+  <div id="mobile-warning-overlay" class="mobile-warning-overlay">
+    <div class="mobile-warning-card">
+      <div class="mobile-warning-icon">
+        <i data-lucide="laptop"></i>
+      </div>
+      <h2>Desktop Device Required</h2>
+      <p>LeetDash analytics dashboard is optimized for PC &amp; Laptop screens. Please switch to a larger desktop display for the complete experience.</p>
+      <button onclick="document.getElementById('mobile-warning-overlay').style.display='none'" class="btn-dismiss-mobile">Proceed Anyway</button>
+    </div>
+  </div>
+
+  <!-- Main Single Page Dashboard Shell -->
+  <div class="dashboard-shell">
+    
+    <!-- Left Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <a href="#" class="sidebar-logo">
+          <div class="logo-icon-box">
+            <i data-lucide="code-2"></i>
+          </div>
+          <span class="logo-text">LeetDash</span>
+        </a>
+
+        <!-- Saved Members Section -->
+        <div class="menu-group">
+          <span class="menu-heading">SAVED MEMBERS</span>
+          <div id="sidebar-members-list" class="sidebar-members-list">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- Navigation View Modes -->
+        <div class="menu-group">
+          <span class="menu-heading">VIEW MODES</span>
+          <button id="menu-view-profile" class="sidebar-menu-btn active">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Profile Dashboard</span>
+          </button>
+          <button id="menu-view-team" class="sidebar-menu-btn">
+            <i data-lucide="trophy"></i>
+            <span>Team Leaderboard</span>
+          </button>
+          <button id="menu-view-daily" class="sidebar-menu-btn">
+            <i data-lucide="calendar-check-2"></i>
+            <span>Daily Track</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bottom Promotional Dark Card -->
+      <div class="sidebar-bottom-card">
+        <div class="dark-card-icon">
+          <i data-lucide="award"></i>
+        </div>
+        <h4>LeetDash Pro</h4>
+        <p>Real-time LeetCode analytics</p>
+        <button id="sidebar-add-btn" class="btn-dark-card">
+          <i data-lucide="plus"></i> Add Member
+        </button>
+      </div>
+    </aside>
+
+    <!-- Right Main Area -->
+    <div class="main-wrapper">
+      
+      <!-- Top Search & User Header -->
+      <header class="top-header">
+        <form id="search-form" class="header-search">
+          <i data-lucide="search" class="search-ic"></i>
+          <input type="text" id="username-input" placeholder="Search LeetCode username..." autocomplete="off" required>
+          <span class="search-kbd">⌘F</span>
+        </form>
+
+        <div class="header-user-profile">
+          <div class="header-icon-btn" title="Notifications">
+            <i data-lucide="bell"></i>
+          </div>
+          <div class="header-icon-btn" title="Messages">
+            <i data-lucide="mail"></i>
+          </div>
+          <div class="user-badge-box">
+            <img id="header-user-avatar" src="https://assets.leetcode.com/users/default_avatar.jpg" alt="Avatar" class="user-avatar-small">
+            <div class="user-details">
+              <strong id="header-user-name">Loading...</strong>
+              <span id="header-user-handle">@username</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Body Container -->
+      <main class="dashboard-body">
+        
+        <!-- Shimmer Skeleton Loading State -->
+        <div id="shimmer-loading-state" class="shimmer-container hidden">
+          <div class="shimmer-card shimmer-header-box"></div>
+          <div class="shimmer-grid-4">
+            <div class="shimmer-card"></div>
+            <div class="shimmer-card"></div>
+            <div class="shimmer-card"></div>
+            <div class="shimmer-card"></div>
+          </div>
+          <div class="shimmer-card full-width-shimmer"></div>
+          <div class="shimmer-grid-3">
+            <div class="shimmer-card"></div>
+            <div class="shimmer-card"></div>
+            <div class="shimmer-card"></div>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="state-container hidden">
+          <div class="error-box">
+            <i data-lucide="alert-circle" class="error-icon"></i>
+            <h3>User Not Found</h3>
+            <p id="error-msg">Could not fetch details for this username.</p>
+            <button id="btn-retry" class="btn-primary-green">Try Again</button>
+          </div>
+        </div>
+
+        <!-- 1. PROFILE DASHBOARD VIEW -->
+        <div id="dashboard-view" class="view-panel-content">
+          
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Dashboard</h1>
+              <p class="page-sub">Analyze and track individual LeetCode performance.</p>
+            </div>
+            <div class="page-actions">
+              <button id="btn-add-member" class="btn-primary-green">
+                <i data-lucide="plus"></i> Save Member
+              </button>
+              <button id="btn-toggle-view" class="btn-secondary-outline">
+                <i data-lucide="trophy"></i> View Leaderboard
+              </button>
+            </div>
+          </div>
+
+          <!-- Row 1: Top Stat Cards (4 Across) -->
+          <div class="stat-cards-grid">
+            
+            <!-- Card 1: Total Solved -->
+            <div class="stat-card green-filled-card">
+              <div class="stat-card-header">
+                <span>Total Solved</span>
+                <button class="stat-arrow-btn white"><i data-lucide="arrow-up-right"></i></button>
+              </div>
+              <div id="stat-total-solved" class="stat-main-num">0</div>
+              <div class="stat-footer-text white-text">
+                <i data-lucide="trending-up"></i>
+                <span id="stat-acceptance-pct">0% Acceptance Rate</span>
+              </div>
+            </div>
+
+            <!-- Card 2: Easy Solved -->
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Easy Solved</span>
+                <button class="stat-arrow-btn"><i data-lucide="arrow-up-right"></i></button>
+              </div>
+              <div id="stat-easy-num" class="stat-main-num">0</div>
+              <div class="stat-footer-text">
+                <span class="dot-indicator easy"></span>
+                <span id="stat-easy-ratio">0 / 0 Questions</span>
+              </div>
+            </div>
+
+            <!-- Card 3: Medium Solved -->
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Medium Solved</span>
+                <button class="stat-arrow-btn"><i data-lucide="arrow-up-right"></i></button>
+              </div>
+              <div id="stat-medium-num" class="stat-main-num">0</div>
+              <div class="stat-footer-text">
+                <span class="dot-indicator medium"></span>
+                <span id="stat-medium-ratio">0 / 0 Questions</span>
+              </div>
+            </div>
+
+            <!-- Card 4: Hard Solved -->
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>Hard Solved</span>
+                <button class="stat-arrow-btn"><i data-lucide="arrow-up-right"></i></button>
+              </div>
+              <div id="stat-hard-num" class="stat-main-num">0</div>
+              <div class="stat-footer-text">
+                <span class="dot-indicator hard"></span>
+                <span id="stat-hard-ratio">0 / 0 Questions</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Row 2: Submission Activity Heatmap -->
+          <div class="grid-card full-width-heatmap-card">
+            <div class="grid-card-header">
+              <div>
+                <h3>Submission Activity</h3>
+                <span id="heatmap-summary" class="title-sub">0 submissions in past 365 days</span>
+              </div>
+              <div class="heatmap-legend">
+                <span>Less</span>
+                <span class="sq lvl-0"></span>
+                <span class="sq lvl-1"></span>
+                <span class="sq lvl-2"></span>
+                <span class="sq lvl-3"></span>
+                <span class="sq lvl-4"></span>
+                <span>More</span>
+              </div>
+            </div>
+            
+            <div class="heatmap-month-container"></div>
+          </div>
+
+          <!-- Row 3: 3 Cards Across -->
+          <div class="row-3-grid">
+            
+            <!-- Card 1: Problem Progress Pie Chart -->
+            <div class="grid-card">
+              <div class="grid-card-header">
+                <div>
+                  <h3>Problem Progress</h3>
+                  <span class="title-sub">Tier breakdown</span>
+                </div>
+                <div class="pie-legend-labels">
+                  <span class="p-leg"><span class="p-dot easy"></span> Easy</span>
+                  <span class="p-leg"><span class="p-dot medium"></span> Med</span>
+                  <span class="p-leg"><span class="p-dot hard"></span> Hard</span>
+                </div>
+              </div>
+              <div class="pie-chart-wrapper">
+                <canvas id="chart-pie-progress"></canvas>
+              </div>
+            </div>
+
+            <!-- Card 2: Contest Rating -->
+            <div class="grid-card">
+              <div class="grid-card-header">
+                <h3>Contest Rating</h3>
+                <span id="val-contest-badge" class="badge-sub green">--</span>
+              </div>
+              <div class="contest-rating-hero">
+                <span id="val-contest-rating" class="hero-rating-num">--</span>
+                <span class="hero-rating-lbl">Global Contest Rating</span>
+              </div>
+              <div class="contest-mini-stats">
+                <div class="c-mini-item">
+                  <span class="c-mini-lbl">Rank</span>
+                  <strong id="val-contest-rank">--</strong>
+                </div>
+                <div class="c-mini-item">
+                  <span class="c-mini-lbl">Top %</span>
+                  <strong id="val-contest-top">--</strong>
+                </div>
+                <div class="c-mini-item">
+                  <span class="c-mini-lbl">Attended</span>
+                  <strong id="val-contest-attended">0</strong>
+                </div>
+              </div>
+              <button id="btn-profile-link" class="btn-green-action">
+                <i data-lucide="external-link"></i> LeetCode Profile
+              </button>
+            </div>
+
+            <!-- Card 3: Dark Green Streak Widget -->
+            <div class="grid-card dark-green-widget">
+              <div class="dark-widget-header">
+                <span>Streak & Activity</span>
+                <i data-lucide="flame" class="flame-ic"></i>
+              </div>
+              <div class="dark-widget-body">
+                <span id="val-streak-count" class="timer-display">00 Days</span>
+                <span class="timer-sub">Active Submission Streak</span>
+              </div>
+              <div class="dark-widget-controls">
+                <button class="control-circle-btn"><i data-lucide="calendar"></i></button>
+                <button class="control-circle-btn red"><i data-lucide="zap"></i></button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Row 4: Recent Accepted Submissions Full-Width Card -->
+          <div class="grid-card full-width-recent-card">
+            <div class="grid-card-header">
+              <div>
+                <h3>Recent Accepted Submissions</h3>
+                <span class="title-sub">Latest solved problems</span>
+              </div>
+            </div>
+            <div class="recent-full-table-container">
+              <table class="recent-full-table">
+                <thead>
+                  <tr>
+                    <th>Problem Title</th>
+                    <th>Date Solved</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-submissions-full-body"></tbody>
+              </table>
+              <div id="recent-empty" class="empty-msg hidden">No recent submissions found.</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 2. TEAM LEADERBOARD VIEW -->
+        <div id="team-view" class="view-panel-content hidden">
+          
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Team Leaderboard</h1>
+              <p class="page-sub">Comprehensive statistics comparison across all saved team members.</p>
+            </div>
+            <div class="page-actions">
+              <button id="btn-refresh-team" class="btn-primary-green">
+                <i data-lucide="rotate-cw"></i> Refresh Data
+              </button>
+              <button id="btn-back-profile" class="btn-secondary-outline">
+                <i data-lucide="user"></i> View Profile
+              </button>
+            </div>
+          </div>
+
+          <div class="leaderboard-full-card">
+            <table class="donezo-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Member</th>
+                  <th>Total Solved</th>
+                  <th>Easy</th>
+                  <th>Medium</th>
+                  <th>Hard</th>
+                  <th>Contest Rating</th>
+                  <th>Acceptance Rate</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="team-leaderboard-body"></tbody>
+            </table>
+          </div>
+
+        </div>
+
+        <!-- 3. DAILY TRACK VIEW -->
+        <div id="daily-track-view" class="view-panel-content hidden">
+          
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Daily Track</h1>
+              <p class="page-sub">Real-time daily problem solving log across all team members.</p>
+            </div>
+            <div class="page-actions">
+              <button id="btn-refresh-daily" class="btn-primary-green">
+                <i data-lucide="rotate-cw"></i> Refresh Activity
+              </button>
+            </div>
+          </div>
+
+          <div id="daily-track-cards-container" class="daily-track-grid">
+            <!-- Team members daily activity cards injected via JS -->
+          </div>
+
+        </div>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
