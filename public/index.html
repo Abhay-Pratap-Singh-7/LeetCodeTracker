@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>LeetDash &bull; LeetCode Team Analytics</title>
   <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,43 +17,54 @@
 </head>
 <body class="donezo-theme">
 
-  <!-- Mobile & Small Device Alert Overlay -->
-  <div id="mobile-warning-overlay" class="mobile-warning-overlay">
-    <div class="mobile-warning-card">
-      <div class="mobile-warning-icon">
-        <i data-lucide="laptop"></i>
+  <!-- Mobile Menu Toggle Button (Visible on Mobile) -->
+  <button id="mobile-toggle-btn" class="mobile-toggle-btn">
+    <i data-lucide="menu"></i>
+  </button>
+
+  <!-- Chat Sender Identity Select Popup Modal -->
+  <div id="chat-identity-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-icon">
+        <i data-lucide="user-check"></i>
       </div>
-      <h2>Desktop Device Required</h2>
-      <p>LeetDash analytics dashboard is optimized for PC &amp; Laptop screens. Please switch to a larger desktop display for the complete experience.</p>
-      <button onclick="document.getElementById('mobile-warning-overlay').style.display='none'" class="btn-dismiss-mobile">Proceed Anyway</button>
+      <h2>Select Your Profile Identity</h2>
+      <p>Choose your profile to post messages in Global Team Chat. This preference will be saved locally.</p>
+      
+      <div class="modal-select-wrapper">
+        <select id="modal-sender-select" class="modal-dropdown"></select>
+      </div>
+
+      <button id="btn-save-chat-identity" class="btn-primary-green full-width-btn">Confirm Identity</button>
     </div>
   </div>
 
   <!-- Main Single Page Dashboard Shell -->
   <div class="dashboard-shell">
     
-    <!-- Left Sidebar -->
-    <aside class="sidebar">
+    <!-- Left Sidebar / Mobile Nav Drawer -->
+    <aside id="sidebar-drawer" class="sidebar">
       <div class="sidebar-top">
-        <a href="#" class="sidebar-logo">
-          <div class="logo-icon-box">
-            <i data-lucide="code-2"></i>
-          </div>
-          <span class="logo-text">LeetDash</span>
-        </a>
-
-        <!-- Saved Members Section -->
-        <div class="menu-group">
-          <span class="menu-heading">SAVED MEMBERS</span>
-          <div id="sidebar-members-list" class="sidebar-members-list">
-            <!-- Injected via JS -->
-          </div>
+        <div class="sidebar-brand-row">
+          <a href="#" class="sidebar-logo">
+            <div class="logo-icon-box">
+              <i data-lucide="code-2"></i>
+            </div>
+            <span class="logo-text">LeetDash</span>
+          </a>
+          <button id="mobile-close-btn" class="mobile-close-btn">
+            <i data-lucide="x"></i>
+          </button>
         </div>
 
-        <!-- Navigation View Modes -->
+        <!-- Navigation View Modes (Shifted to Top) -->
         <div class="menu-group">
           <span class="menu-heading">VIEW MODES</span>
-          <button id="menu-view-profile" class="sidebar-menu-btn active">
+          <button id="menu-view-daily" class="sidebar-menu-btn active">
+            <i data-lucide="calendar-check-2"></i>
+            <span>Daily Track</span>
+          </button>
+          <button id="menu-view-profile" class="sidebar-menu-btn">
             <i data-lucide="layout-dashboard"></i>
             <span>Profile Dashboard</span>
           </button>
@@ -61,44 +72,47 @@
             <i data-lucide="trophy"></i>
             <span>Team Leaderboard</span>
           </button>
-          <button id="menu-view-daily" class="sidebar-menu-btn">
-            <i data-lucide="calendar-check-2"></i>
-            <span>Daily Track</span>
+          <button id="menu-view-warnings" class="sidebar-menu-btn">
+            <i data-lucide="alert-triangle"></i>
+            <span>Warnings</span>
+          </button>
+          <button id="menu-view-chat" class="sidebar-menu-btn">
+            <i data-lucide="message-square"></i>
+            <span>Global Chat</span>
           </button>
         </div>
-      </div>
 
-      <!-- Bottom Promotional Dark Card -->
-      <div class="sidebar-bottom-card">
-        <div class="dark-card-icon">
-          <i data-lucide="award"></i>
+        <!-- Saved Members Section (Shifted Below View Modes) -->
+        <div class="menu-group">
+          <span class="menu-heading">SAVED MEMBERS</span>
+          <div id="sidebar-members-list" class="sidebar-members-list">
+            <!-- Injected via JS -->
+          </div>
         </div>
-        <h4>LeetDash Pro</h4>
-        <p>Real-time LeetCode analytics</p>
-        <button id="sidebar-add-btn" class="btn-dark-card">
-          <i data-lucide="plus"></i> Add Member
-        </button>
+
       </div>
     </aside>
+
+    <!-- Overlay backdrop for mobile drawer -->
+    <div id="sidebar-overlay-backdrop" class="sidebar-overlay-backdrop hidden"></div>
 
     <!-- Right Main Area -->
     <div class="main-wrapper">
       
       <!-- Top Search & User Header -->
       <header class="top-header">
-        <form id="search-form" class="header-search">
-          <i data-lucide="search" class="search-ic"></i>
-          <input type="text" id="username-input" placeholder="Search LeetCode username..." autocomplete="off" required>
-          <span class="search-kbd">⌘F</span>
-        </form>
+        <div class="mobile-header-left">
+          <button id="btn-open-sidebar" class="mobile-menu-trigger">
+            <i data-lucide="menu"></i>
+          </button>
+          <form id="search-form" class="header-search">
+            <i data-lucide="search" class="search-ic"></i>
+            <input type="text" id="username-input" placeholder="Search username..." autocomplete="off" required>
+            <span class="search-kbd">⌘F</span>
+          </form>
+        </div>
 
         <div class="header-user-profile">
-          <div class="header-icon-btn" title="Notifications">
-            <i data-lucide="bell"></i>
-          </div>
-          <div class="header-icon-btn" title="Messages">
-            <i data-lucide="mail"></i>
-          </div>
           <div class="user-badge-box">
             <img id="header-user-avatar" src="https://assets.leetcode.com/users/default_avatar.jpg" alt="Avatar" class="user-avatar-small">
             <div class="user-details">
@@ -139,8 +153,29 @@
           </div>
         </div>
 
-        <!-- 1. PROFILE DASHBOARD VIEW -->
-        <div id="dashboard-view" class="view-panel-content">
+        <!-- 1. DAILY TRACK VIEW (DEFAULT LANDING VIEW) -->
+        <div id="daily-track-view" class="view-panel-content">
+          
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Daily Track</h1>
+              <p class="page-sub">Real-time daily problem solving log across all team members.</p>
+            </div>
+            <div class="page-actions">
+              <button id="btn-refresh-daily" class="btn-primary-green">
+                <i data-lucide="rotate-cw"></i> Refresh Activity
+              </button>
+            </div>
+          </div>
+
+          <div id="daily-track-cards-container" class="daily-track-grid">
+            <!-- Team members daily activity cards injected via JS -->
+          </div>
+
+        </div>
+
+        <!-- 2. PROFILE DASHBOARD VIEW -->
+        <div id="dashboard-view" class="view-panel-content hidden">
           
           <div class="page-header">
             <div>
@@ -152,7 +187,7 @@
                 <i data-lucide="plus"></i> Save Member
               </button>
               <button id="btn-toggle-view" class="btn-secondary-outline">
-                <i data-lucide="trophy"></i> View Leaderboard
+                <i data-lucide="trophy"></i> Leaderboard
               </button>
             </div>
           </div>
@@ -285,19 +320,20 @@
               </button>
             </div>
 
-            <!-- Card 3: Dark Green Streak Widget -->
-            <div class="grid-card dark-green-widget">
-              <div class="dark-widget-header">
-                <span>Streak & Activity</span>
-                <i data-lucide="flame" class="flame-ic"></i>
+            <!-- Card 3: Weekly Report (Mon-Sun Green Bar Chart) -->
+            <div class="grid-card">
+              <div class="grid-card-header">
+                <div>
+                  <h3>Weekly Report</h3>
+                  <span id="weekly-report-sub" class="title-sub">Current week activity</span>
+                </div>
+                <span id="weekly-total-badge" class="badge-sub green">0 Solved</span>
               </div>
-              <div class="dark-widget-body">
-                <span id="val-streak-count" class="timer-display">00 Days</span>
-                <span class="timer-sub">Active Submission Streak</span>
-              </div>
-              <div class="dark-widget-controls">
-                <button class="control-circle-btn"><i data-lucide="calendar"></i></button>
-                <button class="control-circle-btn red"><i data-lucide="zap"></i></button>
+              
+              <div class="weekly-bar-chart-container">
+                <div id="weekly-bar-chart-grid" class="weekly-bar-grid">
+                  <!-- Mon-Sun green bars injected via JS -->
+                </div>
               </div>
             </div>
 
@@ -328,7 +364,7 @@
 
         </div>
 
-        <!-- 2. TEAM LEADERBOARD VIEW -->
+        <!-- 3. TEAM LEADERBOARD VIEW -->
         <div id="team-view" class="view-panel-content hidden">
           
           <div class="page-header">
@@ -338,12 +374,59 @@
             </div>
             <div class="page-actions">
               <button id="btn-refresh-team" class="btn-primary-green">
-                <i data-lucide="rotate-cw"></i> Refresh Data
+                <i data-lucide="rotate-cw"></i> Refresh
               </button>
               <button id="btn-back-profile" class="btn-secondary-outline">
-                <i data-lucide="user"></i> View Profile
+                <i data-lucide="user"></i> Profile
               </button>
             </div>
+          </div>
+
+          <!-- Team Activity Comparison Bar Charts (Daily, Weekly, Monthly) -->
+          <div class="row-3-grid">
+            
+            <!-- Daily Comparison Chart -->
+            <div class="grid-card">
+              <div class="grid-card-header">
+                <div>
+                  <h3>Daily Solved</h3>
+                  <span class="title-sub">Today's solved problems</span>
+                </div>
+                <span id="team-daily-total-badge" class="badge-sub green">0 Solved</span>
+              </div>
+              <div class="weekly-bar-chart-container">
+                <div id="team-daily-bar-chart" class="team-bar-chart-wrapper"></div>
+              </div>
+            </div>
+
+            <!-- Weekly Comparison Chart -->
+            <div class="grid-card">
+              <div class="grid-card-header">
+                <div>
+                  <h3>Weekly Solved</h3>
+                  <span class="title-sub">Mon - Sun accepted AC</span>
+                </div>
+                <span id="team-weekly-total-badge" class="badge-sub green">0 Solved</span>
+              </div>
+              <div class="weekly-bar-chart-container">
+                <div id="team-weekly-bar-chart" class="team-bar-chart-wrapper"></div>
+              </div>
+            </div>
+
+            <!-- Monthly Comparison Chart -->
+            <div class="grid-card">
+              <div class="grid-card-header">
+                <div>
+                  <h3>Monthly Solved</h3>
+                  <span class="title-sub">Current month total</span>
+                </div>
+                <span id="team-monthly-total-badge" class="badge-sub green">0 Solved</span>
+              </div>
+              <div class="weekly-bar-chart-container">
+                <div id="team-monthly-bar-chart" class="team-bar-chart-wrapper"></div>
+              </div>
+            </div>
+
           </div>
 
           <div class="leaderboard-full-card">
@@ -367,23 +450,60 @@
 
         </div>
 
-        <!-- 3. DAILY TRACK VIEW -->
-        <div id="daily-track-view" class="view-panel-content hidden">
+        <!-- 4. WARNINGS VIEW -->
+        <div id="warnings-view" class="view-panel-content hidden">
           
           <div class="page-header">
             <div>
-              <h1 class="page-title">Daily Track</h1>
-              <p class="page-sub">Real-time daily problem solving log across all team members.</p>
+              <h1 class="page-title">Team Warnings</h1>
+              <p class="page-sub">Tracking member compliance (at least 1 problem/day required since Aug 21, 2026).</p>
             </div>
             <div class="page-actions">
-              <button id="btn-refresh-daily" class="btn-primary-green">
-                <i data-lucide="rotate-cw"></i> Refresh Activity
+              <button id="btn-refresh-warnings" class="btn-primary-green">
+                <i data-lucide="rotate-cw"></i> Recalculate
               </button>
             </div>
           </div>
 
-          <div id="daily-track-cards-container" class="daily-track-grid">
-            <!-- Team members daily activity cards injected via JS -->
+          <div id="warnings-cards-container" class="daily-track-grid">
+            <!-- Warnings breakdown cards injected via JS -->
+          </div>
+
+        </div>
+
+        <!-- 5. GLOBAL CHAT VIEW -->
+        <div id="global-chat-view" class="view-panel-content hidden">
+          
+          <div class="page-header">
+            <div>
+              <h1 class="page-title">Global Team Chat</h1>
+              <p class="page-sub">Discuss problems with your team. Paste LeetCode links for problem cards.</p>
+            </div>
+            <div class="page-actions">
+              <div class="chat-identity-badge-box">
+                <span class="chat-sender-label">Posting as:</span>
+                <div class="active-user-pill">
+                  <img id="chat-active-avatar" src="https://assets.leetcode.com/users/default_avatar.jpg" class="active-user-avatar">
+                  <span id="chat-active-name">Profile</span>
+                </div>
+                <button id="btn-switch-identity" class="btn-secondary-outline btn-sm">
+                  <i data-lucide="user-cog"></i> Switch
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-window-card">
+            <div id="chat-messages-body" class="chat-messages-container">
+              <!-- Chat messages injected via JS -->
+            </div>
+
+            <form id="chat-send-form" class="chat-input-row">
+              <input type="text" id="chat-input-text" placeholder="Type a message or paste a LeetCode URL..." autocomplete="off" required>
+              <button type="submit" class="btn-primary-green">
+                <i data-lucide="send"></i>
+              </button>
+            </form>
           </div>
 
         </div>

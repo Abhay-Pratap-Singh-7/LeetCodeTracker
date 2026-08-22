@@ -1,5 +1,5 @@
 /* ==========================================================================
-   LeetDash - Today's Solved Problems Daily Track Engine
+   LeetDash - Multi-View Engine & Universal Shimmer Loading Across All Tabs
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -13,7 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     { username: 'Aryanj_17', name: 'Aryan', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
     { username: 'kartik23-2', name: 'Kartik', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
     { username: '_palakdeep', name: 'Palakdeep', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: '18WAgXvMr1', name: 'Abhay', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' }
+    { username: '18WAgXvMr1', name: 'Abhay', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
+    { username: 'I2pULBxMMM', name: 'Akhilesh', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' }
   ];
 
   let savedMembers = DEFAULT_TEAM;
@@ -42,15 +43,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
   localStorage.setItem('leetdash_saved_members_v2', JSON.stringify(savedMembers));
 
+  let activeChatSender = localStorage.getItem('leetdash_chat_sender_v1') || '';
+
+  let storedChat = localStorage.getItem('leetdash_global_chat_v1');
+  let chatMessages = [];
+  if (storedChat) {
+    try {
+      const parsedChat = JSON.parse(storedChat);
+      if (Array.isArray(parsedChat)) chatMessages = parsedChat;
+    } catch (e) {}
+  }
+
   const state = {
     currentUser: null,
     savedMembers: savedMembers,
     teamData: {},
-    activeView: 'single',
+    activeChatSender: activeChatSender,
+    chatMessages: chatMessages,
+    activeView: 'daily',
     charts: {
       pieProgress: null
     }
   };
+
+  // Mobile Drawer Controls
+  const sidebarDrawer = document.getElementById('sidebar-drawer');
+  const sidebarOverlayBackdrop = document.getElementById('sidebar-overlay-backdrop');
+  const btnOpenSidebar = document.getElementById('btn-open-sidebar');
+  const mobileCloseBtn = document.getElementById('mobile-close-btn');
 
   const searchForm = document.getElementById('search-form');
   const usernameInput = document.getElementById('username-input');
@@ -59,15 +79,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnBackProfile = document.getElementById('btn-back-profile');
   const btnRefreshTeam = document.getElementById('btn-refresh-team');
   const btnRefreshDaily = document.getElementById('btn-refresh-daily');
+  const btnRefreshWarnings = document.getElementById('btn-refresh-warnings');
 
   const menuViewProfile = document.getElementById('menu-view-profile');
   const menuViewTeam = document.getElementById('menu-view-team');
   const menuViewDaily = document.getElementById('menu-view-daily');
-  const sidebarAddBtn = document.getElementById('sidebar-add-btn');
+  const menuViewWarnings = document.getElementById('menu-view-warnings');
+  const menuViewChat = document.getElementById('menu-view-chat');
 
   const dashboardView = document.getElementById('dashboard-view');
   const teamView = document.getElementById('team-view');
   const dailyTrackView = document.getElementById('daily-track-view');
+  const warningsView = document.getElementById('warnings-view');
+  const globalChatView = document.getElementById('global-chat-view');
+
+  const chatIdentityModal = document.getElementById('chat-identity-modal');
+  const modalSenderSelect = document.getElementById('modal-sender-select');
+  const btnSaveChatIdentity = document.getElementById('btn-save-chat-identity');
+  const btnSwitchIdentity = document.getElementById('btn-switch-identity');
+  const chatActiveName = document.getElementById('chat-active-name');
+  const chatActiveAvatar = document.getElementById('chat-active-avatar');
+
+  const chatSendForm = document.getElementById('chat-send-form');
+  const chatInputText = document.getElementById('chat-input-text');
+  const chatMessagesBody = document.getElementById('chat-messages-body');
 
   const shimmerLoadingState = document.getElementById('shimmer-loading-state');
   const errorState = document.getElementById('error-state');
@@ -88,17 +123,44 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSidebarMembers();
     setupEventListeners();
 
+    switchView('daily');
+
     const firstValidMember = state.savedMembers.find(m => m && m.username);
-    const defaultUser = firstValidMember ? firstValidMember.username : 'aditya7417';
-    loadUserData(defaultUser);
+    const defaultUser = firstValidMember ? firstValidMember.username : '18WAgXvMr1';
+    loadUserDataSilent(defaultUser);
+  }
+
+  function openMobileSidebar() {
+    if (sidebarDrawer) sidebarDrawer.classList.add('open');
+    if (sidebarOverlayBackdrop) sidebarOverlayBackdrop.classList.remove('hidden');
+    document.body.classList.add('sidebar-open');
+  }
+
+  function closeMobileSidebar() {
+    if (sidebarDrawer) sidebarDrawer.classList.remove('open');
+    if (sidebarOverlayBackdrop) sidebarOverlayBackdrop.classList.add('hidden');
+    document.body.classList.remove('sidebar-open');
   }
 
   function setupEventListeners() {
+    if (btnOpenSidebar) {
+      btnOpenSidebar.addEventListener('click', () => openMobileSidebar());
+    }
+
+    if (mobileCloseBtn) {
+      mobileCloseBtn.addEventListener('click', () => closeMobileSidebar());
+    }
+
+    if (sidebarOverlayBackdrop) {
+      sidebarOverlayBackdrop.addEventListener('click', () => closeMobileSidebar());
+    }
+
     searchForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const username = usernameInput.value.trim();
       if (username) {
         loadUserData(username);
+        switchView('single');
       }
     });
 
@@ -119,21 +181,93 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    if (sidebarAddBtn) sidebarAddBtn.addEventListener('click', () => usernameInput.focus());
-
-    menuViewProfile.addEventListener('click', () => switchView('single'));
-    menuViewTeam.addEventListener('click', () => switchView('team'));
-    if (menuViewDaily) menuViewDaily.addEventListener('click', () => switchView('daily'));
+    menuViewProfile.addEventListener('click', () => { switchView('single'); closeMobileSidebar(); });
+    menuViewTeam.addEventListener('click', () => { switchView('team'); closeMobileSidebar(); });
+    if (menuViewDaily) menuViewDaily.addEventListener('click', () => { switchView('daily'); closeMobileSidebar(); });
+    if (menuViewWarnings) menuViewWarnings.addEventListener('click', () => { switchView('warnings'); closeMobileSidebar(); });
+    if (menuViewChat) menuViewChat.addEventListener('click', () => { switchView('chat'); closeMobileSidebar(); });
 
     if (btnToggleView) btnToggleView.addEventListener('click', () => switchView('team'));
     if (btnBackProfile) btnBackProfile.addEventListener('click', () => switchView('single'));
     if (btnRefreshTeam) btnRefreshTeam.addEventListener('click', () => loadTeamData());
     if (btnRefreshDaily) btnRefreshDaily.addEventListener('click', () => loadDailyTrackData());
+    if (btnRefreshWarnings) btnRefreshWarnings.addEventListener('click', () => loadWarningsData());
+
+    if (btnSwitchIdentity) {
+      btnSwitchIdentity.addEventListener('click', () => openIdentityModal());
+    }
+
+    if (btnSaveChatIdentity) {
+      btnSaveChatIdentity.addEventListener('click', () => {
+        const selected = modalSenderSelect.value;
+        if (selected) {
+          state.activeChatSender = selected;
+          localStorage.setItem('leetdash_chat_sender_v1', selected);
+          updateActiveIdentityUI();
+          chatIdentityModal.classList.add('hidden');
+          renderGlobalChat();
+        }
+      });
+    }
+
+    if (chatSendForm) {
+      chatSendForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = chatInputText.value.trim();
+
+        if (!state.activeChatSender) {
+          openIdentityModal();
+          return;
+        }
+
+        if (!text) return;
+
+        const newMsg = {
+          id: Date.now(),
+          senderUsername: state.activeChatSender,
+          text: text,
+          timestamp: new Date().toISOString()
+        };
+
+        state.chatMessages.push(newMsg);
+        localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
+        chatInputText.value = '';
+        renderGlobalChat();
+      });
+    }
 
     btnRetry.addEventListener('click', () => {
-      const username = usernameInput.value.trim() || 'aditya7417';
+      const username = usernameInput.value.trim() || '18WAgXvMr1';
       loadUserData(username);
     });
+  }
+
+  function openIdentityModal() {
+    if (!modalSenderSelect) return;
+    modalSenderSelect.innerHTML = '';
+
+    state.savedMembers.forEach(member => {
+      if (!member || !member.username) return;
+      const opt = document.createElement('option');
+      opt.value = member.username;
+      opt.textContent = `${member.name || member.username} (@${member.username})`;
+      if (state.activeChatSender === member.username) opt.selected = true;
+      modalSenderSelect.appendChild(opt);
+    });
+
+    chatIdentityModal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  function updateActiveIdentityUI() {
+    const member = state.savedMembers.find(m => m.username === state.activeChatSender);
+    if (member) {
+      if (chatActiveName) chatActiveName.textContent = member.name || member.username;
+      if (chatActiveAvatar) chatActiveAvatar.src = member.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg';
+    } else {
+      if (chatActiveName) chatActiveName.textContent = 'Select Profile';
+      if (chatActiveAvatar) chatActiveAvatar.src = 'https://assets.leetcode.com/users/default_avatar.jpg';
+    }
   }
 
   function switchView(view) {
@@ -141,14 +275,22 @@ document.addEventListener('DOMContentLoaded', () => {
     menuViewProfile.classList.remove('active');
     menuViewTeam.classList.remove('active');
     if (menuViewDaily) menuViewDaily.classList.remove('active');
+    if (menuViewWarnings) menuViewWarnings.classList.remove('active');
+    if (menuViewChat) menuViewChat.classList.remove('active');
 
     dashboardView.classList.add('hidden');
     teamView.classList.add('hidden');
     if (dailyTrackView) dailyTrackView.classList.add('hidden');
+    if (warningsView) warningsView.classList.add('hidden');
+    if (globalChatView) globalChatView.classList.add('hidden');
 
     if (view === 'single') {
       menuViewProfile.classList.add('active');
       dashboardView.classList.remove('hidden');
+      if (!state.currentUser) {
+        const firstValidMember = state.savedMembers.find(m => m && m.username);
+        if (firstValidMember) loadUserData(firstValidMember.username);
+      }
     } else if (view === 'team') {
       menuViewTeam.classList.add('active');
       teamView.classList.remove('hidden');
@@ -157,6 +299,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (menuViewDaily) menuViewDaily.classList.add('active');
       if (dailyTrackView) dailyTrackView.classList.remove('hidden');
       loadDailyTrackData();
+    } else if (view === 'warnings') {
+      if (menuViewWarnings) menuViewWarnings.classList.add('active');
+      if (warningsView) warningsView.classList.remove('hidden');
+      loadWarningsData();
+    } else if (view === 'chat') {
+      if (menuViewChat) menuViewChat.classList.add('active');
+      if (globalChatView) globalChatView.classList.remove('hidden');
+
+      if (!state.activeChatSender) {
+        openIdentityModal();
+      } else {
+        updateActiveIdentityUI();
+      }
+
+      renderGlobalChat();
     }
     if (window.lucide) window.lucide.createIcons();
   }
@@ -191,10 +348,27 @@ document.addEventListener('DOMContentLoaded', () => {
         usernameInput.value = member.username;
         loadUserData(member.username);
         if (state.activeView !== 'single') switchView('single');
+        closeMobileSidebar();
       });
 
       list.appendChild(item);
     });
+  }
+
+  async function loadUserDataSilent(username) {
+    if (!username) return;
+    try {
+      const response = await fetch(`/api/user/${encodeURIComponent(username)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.username) {
+          state.currentUser = data;
+          state.teamData[username] = data;
+          renderDashboard(data);
+          renderSidebarMembers();
+        }
+      }
+    } catch (e) {}
   }
 
   async function loadUserData(username) {
@@ -316,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     renderProgressPieChart(stats);
-    renderStreakWidget(data.submissionCalendar);
+    renderWeeklyAcceptedReportBarChart(data.recentSubmissions || []);
     renderRecentSubmissionsClean(data.recentSubmissions || []);
 
     if (window.lucide) window.lucide.createIcons();
@@ -448,27 +622,71 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function renderStreakWidget(rawCalendarData) {
-    const parsedCalendar = parseSubmissionCalendar(rawCalendarData);
-    let currentStreak = 0;
-    const today = new Date();
+  function renderWeeklyAcceptedReportBarChart(recentSubmissions) {
+    const grid = document.getElementById('weekly-bar-chart-grid');
+    const badge = document.getElementById('weekly-total-badge');
+    const subText = document.getElementById('weekly-report-sub');
+    if (!grid) return;
 
-    for (let i = 0; i < 365; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateKey = formatLocalDateKey(d);
-      const count = parsedCalendar[dateKey] || 0;
+    grid.innerHTML = '';
 
-      if (count > 0) {
-        currentStreak++;
-      } else if (i === 0) {
-        continue;
-      } else {
-        break;
+    const acceptedCountByDate = {};
+    recentSubmissions.forEach(sub => {
+      if (sub.timestamp) {
+        const dateKey = formatLocalDateKey(new Date(parseInt(sub.timestamp, 10) * 1000));
+        acceptedCountByDate[dateKey] = (acceptedCountByDate[dateKey] || 0) + 1;
       }
+    });
+
+    const today = new Date();
+    const currentDayOfWeek = today.getDay();
+    const diffToMon = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMon);
+
+    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const weekData = [];
+    let totalAcceptedThisWeek = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateKey = formatLocalDateKey(d);
+      const count = acceptedCountByDate[dateKey] || 0;
+      totalAcceptedThisWeek += count;
+
+      const isToday = dateKey === formatLocalDateKey(today);
+
+      weekData.push({
+        label: dayLabels[i],
+        count: count,
+        dateKey: dateKey,
+        isToday: isToday
+      });
     }
 
-    document.getElementById('val-streak-count').textContent = `${currentStreak.toString().padStart(2, '0')} Days`;
+    if (badge) badge.textContent = `${totalAcceptedThisWeek} Accepted`;
+    if (subText) subText.textContent = `Mon - Sun accepted AC`;
+
+    const maxCount = Math.max(1, ...weekData.map(w => w.count));
+
+    weekData.forEach(item => {
+      const col = document.createElement('div');
+      col.className = `weekly-bar-col ${item.isToday ? 'today' : ''}`;
+
+      const pct = Math.max(4, Math.round((item.count / maxCount) * 100));
+
+      col.innerHTML = `
+        <span class="weekly-bar-count">${item.count}</span>
+        <div class="weekly-bar-track" title="${item.label}: ${item.count} accepted solved">
+          <div class="weekly-bar-fill" style="height: ${item.count > 0 ? pct + '%' : '4%'}; opacity: ${item.count > 0 ? 1 : 0.3}"></div>
+        </div>
+        <span class="weekly-bar-label">${item.label}</span>
+      `;
+
+      grid.appendChild(col);
+    });
   }
 
   function renderRecentSubmissionsClean(submissions) {
@@ -499,12 +717,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Load & Render Daily Track Data (Strictly Filters for Current Day Solved Problems)
   async function loadDailyTrackData() {
     const container = document.getElementById('daily-track-cards-container');
     if (!container) return;
 
-    container.innerHTML = `<div style="grid-column: span 2; text-align: center; padding: 40px; font-weight: 700; color: var(--text-muted);">Fetching live daily track data for all team members...</div>`;
+    container.innerHTML = `
+      <div class="daily-shimmer-card"></div>
+      <div class="daily-shimmer-card"></div>
+      <div class="daily-shimmer-card"></div>
+      <div class="daily-shimmer-card"></div>
+    `;
 
     const fetchPromises = state.savedMembers.map(async (member) => {
       if (!member || !member.username) return;
@@ -532,7 +754,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = state.teamData[member.username];
       const allSubmissions = data?.recentSubmissions || [];
 
-      // Filter submissions for problems solved ON THE CURRENT DAY
       const todaySubmissions = allSubmissions.filter(sub => {
         if (!sub.timestamp) return false;
         const subDateStr = formatLocalDateKey(new Date(parseInt(sub.timestamp, 10) * 1000));
@@ -587,10 +808,141 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) window.lucide.createIcons();
   }
 
+  async function loadWarningsData() {
+    const container = document.getElementById('warnings-cards-container');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="daily-shimmer-card"></div>
+      <div class="daily-shimmer-card"></div>
+      <div class="daily-shimmer-card"></div>
+      <div class="daily-shimmer-card"></div>
+    `;
+
+    const fetchPromises = state.savedMembers.map(async (member) => {
+      if (!member || !member.username) return;
+      const username = member.username;
+      try {
+        const res = await fetch(`/api/user/${encodeURIComponent(username)}`);
+        if (res.ok) {
+          const data = await res.json();
+          state.teamData[username] = data;
+          member.name = data.name || username;
+          member.avatar = data.avatar || member.avatar;
+        }
+      } catch (e) {}
+    });
+
+    await Promise.all(fetchPromises);
+    saveMembersToStorage();
+
+    container.innerHTML = '';
+
+    const startDate = new Date(2026, 7, 21); // Aug 21, 2026
+    const endDate = new Date(); // Current date
+
+    const targetDateList = [];
+    let cur = new Date(startDate);
+    while (cur <= endDate) {
+      targetDateList.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    state.savedMembers.forEach(member => {
+      if (!member || !member.username) return;
+      const data = state.teamData[member.username];
+      const parsedCalendar = parseSubmissionCalendar(data?.submissionCalendar);
+      const recentSubmissions = data?.recentSubmissions || [];
+
+      const recentCountByDate = {};
+      recentSubmissions.forEach(s => {
+        if (s.timestamp) {
+          const dKey = formatLocalDateKey(new Date(parseInt(s.timestamp, 10) * 1000));
+          recentCountByDate[dKey] = (recentCountByDate[dKey] || 0) + 1;
+        }
+      });
+
+      const missedDates = [];
+
+      targetDateList.forEach(targetDate => {
+        const dateKey = formatLocalDateKey(targetDate);
+        const calendarCount = parsedCalendar[dateKey] || 0;
+        const recentCount = recentCountByDate[dateKey] || 0;
+        const totalCount = Math.max(calendarCount, recentCount);
+
+        if (totalCount === 0) {
+          const formattedStr = targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+          missedDates.push(formattedStr);
+        }
+      });
+
+      const card = document.createElement('div');
+      card.className = 'daily-member-card';
+
+      const displayName = member.name || member.username;
+      const avatarUrl = member.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg';
+      const warningCount = missedDates.length;
+
+      let warningsHTML = '';
+      if (warningCount === 0) {
+        warningsHTML = `<div style="font-size: 0.88rem; color: var(--primary-green); font-weight: 700; text-align: center; padding: 18px 0; background: var(--primary-green-light); border-radius: var(--radius-md); border: 1px solid var(--primary-green-border);">Clean Streak! 0 warnings recorded.</div>`;
+      } else {
+        missedDates.forEach(dateStr => {
+          warningsHTML += `
+            <div class="warning-date-item">
+              <div class="warning-date-left">
+                <i data-lucide="alert-triangle" style="width: 16px; height: 16px; color: #dc2626;"></i>
+                <span>Failed to solve at least 1 problem</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 0.76rem;">${dateStr}</span>
+            </div>
+          `;
+        });
+      }
+
+      card.innerHTML = `
+        <div class="daily-card-header">
+          <div class="daily-member-info">
+            <img src="${avatarUrl}" alt="${displayName}" class="daily-member-avatar" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
+            <div>
+              <div class="daily-member-name">${displayName}</div>
+              <div class="daily-member-handle">@${member.username}</div>
+            </div>
+          </div>
+          <span class="warning-badge-count ${warningCount > 0 ? 'danger' : 'success'}">
+            <i data-lucide="${warningCount > 0 ? 'alert-circle' : 'shield-check'}" style="width: 14px; height: 14px;"></i>
+            ${warningCount} ${warningCount === 1 ? 'Warning' : 'Warnings'}
+          </span>
+        </div>
+        <div class="daily-problems-list">
+          ${warningsHTML}
+        </div>
+      `;
+
+      container.appendChild(card);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
   async function loadTeamData() {
     const tbody = document.getElementById('team-leaderboard-body');
-    if (!tbody) return;
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 30px;">Loading team stats...</td></tr>`;
+    const dailyChartEl = document.getElementById('team-daily-bar-chart');
+    const weeklyChartEl = document.getElementById('team-weekly-bar-chart');
+    const monthlyChartEl = document.getElementById('team-monthly-bar-chart');
+
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr class="table-shimmer-row"><td colspan="9"></td></tr>
+        <tr class="table-shimmer-row"><td colspan="9"></td></tr>
+        <tr class="table-shimmer-row"><td colspan="9"></td></tr>
+        <tr class="table-shimmer-row"><td colspan="9"></td></tr>
+      `;
+    }
+
+    if (dailyChartEl) dailyChartEl.innerHTML = `<div class="daily-shimmer-card" style="height: 140px;"></div>`;
+    if (weeklyChartEl) weeklyChartEl.innerHTML = `<div class="daily-shimmer-card" style="height: 140px;"></div>`;
+    if (monthlyChartEl) monthlyChartEl.innerHTML = `<div class="daily-shimmer-card" style="height: 140px;"></div>`;
 
     const fetchPromises = state.savedMembers.map(async (member) => {
       if (!member || !member.username) return;
@@ -616,39 +968,238 @@ document.addEventListener('DOMContentLoaded', () => {
       .filter(Boolean)
       .sort((a, b) => b.stats.totalSolved - a.stats.totalSolved);
 
-    tbody.innerHTML = '';
-    teamList.forEach((member, index) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><span class="rank-badge rank-${index + 1}">${index + 1}</span></td>
-        <td>
-          <div class="user-cell">
-            <img src="${member.avatar}" alt="${member.username}" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
-            <div>
-              <div><strong>${member.name}</strong></div>
-              <div style="font-size: 0.72rem; color: var(--text-light);">@${member.username}</div>
+    if (tbody) {
+      tbody.innerHTML = '';
+      teamList.forEach((member, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="rank-badge rank-${index + 1}">${index + 1}</span></td>
+          <td>
+            <div class="user-cell">
+              <img src="${member.avatar}" alt="${member.username}" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
+              <div>
+                <div><strong>${member.name}</strong></div>
+                <div style="font-size: 0.72rem; color: var(--text-light);">@${member.username}</div>
+              </div>
             </div>
-          </div>
-        </td>
-        <td><strong>${member.stats.totalSolved.toLocaleString()}</strong></td>
-        <td><span style="color: var(--easy-color);">${member.stats.easySolved.toLocaleString()}</span></td>
-        <td><span style="color: var(--medium-color);">${member.stats.mediumSolved.toLocaleString()}</span></td>
-        <td><span style="color: var(--hard-color);">${member.stats.hardSolved.toLocaleString()}</span></td>
-        <td><strong>${member.contest.rating || 'N/A'}</strong></td>
-        <td>${member.stats.acceptanceRate}</td>
-        <td>
-          <button class="btn-pill-small btn-inspect" data-username="${member.username}">Inspect Profile</button>
-        </td>
+          </td>
+          <td><strong>${member.stats.totalSolved.toLocaleString()}</strong></td>
+          <td><span style="color: var(--easy-color);">${member.stats.easySolved.toLocaleString()}</span></td>
+          <td><span style="color: var(--medium-color);">${member.stats.mediumSolved.toLocaleString()}</span></td>
+          <td><span style="color: var(--hard-color);">${member.stats.hardSolved.toLocaleString()}</span></td>
+          <td><strong>${member.contest.rating || 'N/A'}</strong></td>
+          <td>${member.stats.acceptanceRate}</td>
+          <td>
+            <button class="btn-pill-small btn-inspect" data-username="${member.username}">Inspect Profile</button>
+          </td>
+        `;
+
+        tr.querySelector('.btn-inspect').addEventListener('click', () => {
+          usernameInput.value = member.username;
+          loadUserData(member.username);
+          switchView('single');
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    renderTeamComparisonBarCharts(teamList);
+  }
+
+  function renderTeamComparisonBarCharts(teamList) {
+    const dailyChartEl = document.getElementById('team-daily-bar-chart');
+    const weeklyChartEl = document.getElementById('team-weekly-bar-chart');
+    const monthlyChartEl = document.getElementById('team-monthly-bar-chart');
+
+    const dailyBadge = document.getElementById('team-daily-total-badge');
+    const weeklyBadge = document.getElementById('team-weekly-total-badge');
+    const monthlyBadge = document.getElementById('team-monthly-total-badge');
+
+    if (!dailyChartEl || !weeklyChartEl || !monthlyChartEl) return;
+
+    const today = new Date();
+    const todayStr = formatLocalDateKey(today);
+
+    const diffToMon = today.getDay() === 0 ? -6 : 1 - today.getDay();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMon);
+    const mondayStr = formatLocalDateKey(monday);
+
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+
+    const dailyMetrics = [];
+    const weeklyMetrics = [];
+    const monthlyMetrics = [];
+
+    let totalTeamDaily = 0;
+    let totalTeamWeekly = 0;
+    let totalTeamMonthly = 0;
+
+    teamList.forEach(member => {
+      const parsedCalendar = parseSubmissionCalendar(member.submissionCalendar);
+      const recentSubmissions = member.recentSubmissions || [];
+
+      // Calculate Daily Count
+      const recentDaily = recentSubmissions.filter(s => s.timestamp && formatLocalDateKey(new Date(parseInt(s.timestamp, 10) * 1000)) === todayStr).length;
+      const calDaily = parsedCalendar[todayStr] || 0;
+      const dailyCount = Math.max(recentDaily, calDaily);
+      totalTeamDaily += dailyCount;
+      dailyMetrics.push({ name: member.name.split(' ')[0], count: dailyCount });
+
+      // Calculate Weekly Count (Mon to Today)
+      let weekCount = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const dKey = formatLocalDateKey(d);
+        if (dKey <= todayStr) {
+          const recC = recentSubmissions.filter(s => s.timestamp && formatLocalDateKey(new Date(parseInt(s.timestamp, 10) * 1000)) === dKey).length;
+          const calC = parsedCalendar[dKey] || 0;
+          weekCount += Math.max(recC, calC);
+        }
+      }
+      totalTeamWeekly += weekCount;
+      weeklyMetrics.push({ name: member.name.split(' ')[0], count: weekCount });
+
+      // Calculate Monthly Count
+      let monthCount = 0;
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      for (let day = 1; day <= daysInMonth; day++) {
+        const d = new Date(currentYear, currentMonth, day);
+        const dKey = formatLocalDateKey(d);
+        if (dKey <= todayStr) {
+          const recC = recentSubmissions.filter(s => s.timestamp && formatLocalDateKey(new Date(parseInt(s.timestamp, 10) * 1000)) === dKey).length;
+          const calC = parsedCalendar[dKey] || 0;
+          monthCount += Math.max(recC, calC);
+        }
+      }
+      totalTeamMonthly += monthCount;
+      monthlyMetrics.push({ name: member.name.split(' ')[0], count: monthCount });
+    });
+
+    if (dailyBadge) dailyBadge.textContent = `${totalTeamDaily} Solved`;
+    if (weeklyBadge) weeklyBadge.textContent = `${totalTeamWeekly} Solved`;
+    if (monthlyBadge) monthlyBadge.textContent = `${totalTeamMonthly} Solved`;
+
+    // Sort in decreasing order (highest solver to lowest solver)
+    dailyMetrics.sort((a, b) => b.count - a.count);
+    weeklyMetrics.sort((a, b) => b.count - a.count);
+    monthlyMetrics.sort((a, b) => b.count - a.count);
+
+    renderMiniTeamChart(dailyChartEl, dailyMetrics);
+    renderMiniTeamChart(weeklyChartEl, weeklyMetrics);
+    renderMiniTeamChart(monthlyChartEl, monthlyMetrics);
+  }
+
+  function renderMiniTeamChart(container, metrics) {
+    container.innerHTML = '';
+    const maxVal = Math.max(1, ...metrics.map(m => m.count));
+
+    metrics.forEach(m => {
+      const col = document.createElement('div');
+      col.className = 'team-bar-col';
+
+      const pct = Math.max(4, Math.round((m.count / maxVal) * 100));
+
+      col.innerHTML = `
+        <span class="weekly-bar-count">${m.count}</span>
+        <div class="weekly-bar-track" title="${m.name}: ${m.count} solved">
+          <div class="weekly-bar-fill" style="height: ${m.count > 0 ? pct + '%' : '4%'}; opacity: ${m.count > 0 ? 1 : 0.3}"></div>
+        </div>
+        <span class="weekly-bar-label">${m.name}</span>
       `;
 
-      tr.querySelector('.btn-inspect').addEventListener('click', () => {
-        usernameInput.value = member.username;
-        loadUserData(member.username);
-        switchView('single');
-      });
-
-      tbody.appendChild(tr);
+      container.appendChild(col);
     });
+  }
+
+  function extractLeetCodeSlug(text) {
+    const regex = /https:\/\/leetcode\.com\/problems\/([a-zA-Z0-9-]+)/i;
+    const match = text.match(regex);
+    return match ? match[1].replace(/\/$/, '') : null;
+  }
+
+  function renderGlobalChat() {
+    if (!chatMessagesBody) return;
+    chatMessagesBody.innerHTML = '';
+
+    if (!state.chatMessages || state.chatMessages.length === 0) {
+      chatMessagesBody.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.88rem; padding: 60px 20px; font-weight: 600;">No messages yet. Start the conversation by typing a message or sharing a LeetCode problem link!</div>`;
+      return;
+    }
+
+    let lastSenderUsername = null;
+    let lastContentBox = null;
+
+    state.chatMessages.forEach(msg => {
+      const isMine = msg.senderUsername === state.activeChatSender;
+      const sender = state.savedMembers.find(m => m.username === msg.senderUsername) || {
+        username: msg.senderUsername,
+        name: msg.senderUsername,
+        avatar: 'https://assets.leetcode.com/users/default_avatar.jpg'
+      };
+
+      const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const slug = extractLeetCodeSlug(msg.text);
+
+      let richCardHTML = '';
+      if (slug) {
+        const problemTitle = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        const problemUrl = `https://leetcode.com/problems/${slug}/`;
+
+        richCardHTML = `
+          <div class="leetcode-rich-card">
+            <div class="leetcode-card-left">
+              <div class="leetcode-logo-badge">LC</div>
+              <div class="leetcode-card-info">
+                <a href="${problemUrl}" target="_blank" class="leetcode-card-title">${problemTitle}</a>
+                <span class="leetcode-card-slug">leetcode.com/problems/${slug}</span>
+              </div>
+            </div>
+            <a href="${problemUrl}" target="_blank" class="leetcode-card-link-btn">
+              <span>Solve Problem</span>
+              <i data-lucide="arrow-up-right" style="width: 15px; height: 15px;"></i>
+            </a>
+          </div>
+        `;
+      }
+
+      const bubbleHTML = `
+        <div class="chat-msg-bubble">
+          ${msg.text}
+          ${richCardHTML}
+        </div>
+      `;
+
+      if (lastSenderUsername === msg.senderUsername && lastContentBox) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = bubbleHTML;
+        lastContentBox.appendChild(tempDiv.firstElementChild);
+      } else {
+        lastSenderUsername = msg.senderUsername;
+        const msgItem = document.createElement('div');
+        msgItem.className = `chat-msg-item ${isMine ? 'mine' : 'other'}`;
+
+        msgItem.innerHTML = `
+          <img src="${sender.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg'}" class="chat-msg-avatar" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
+          <div class="chat-msg-content-box">
+            <div class="chat-msg-header">
+              <span class="chat-msg-author">${sender.name || sender.username}</span>
+              <span class="chat-msg-time">${timeStr}</span>
+            </div>
+            ${bubbleHTML}
+          </div>
+        `;
+
+        chatMessagesBody.appendChild(msgItem);
+        lastContentBox = msgItem.querySelector('.chat-msg-content-box');
+      }
+    });
+
+    chatMessagesBody.scrollTop = chatMessagesBody.scrollHeight;
+    if (window.lucide) window.lucide.createIcons();
   }
 
   function showShimmerLoading() {
