@@ -14,7 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     { username: 'kartik23-2', name: 'Kartik', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
     { username: '_palakdeep', name: 'Palakdeep', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
     { username: '18WAgXvMr1', name: 'Abhay', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: 'I2pULBxMMM', name: 'Akhilesh', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' }
+    { username: 'I2pULBxMMM', name: 'Akhilesh', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
+    { username: 'janhavi0411', name: 'Janhavi', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' }
   ];
 
   let savedMembers = DEFAULT_TEAM;
@@ -40,6 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
       savedMembers = DEFAULT_TEAM;
     }
   }
+
+  DEFAULT_TEAM.forEach(m => {
+    if (!savedMembers.some(sm => sm.username.toLowerCase() === m.username.toLowerCase())) {
+      savedMembers.push(m);
+    }
+  });
 
   localStorage.setItem('leetdash_saved_members_v2', JSON.stringify(savedMembers));
 
