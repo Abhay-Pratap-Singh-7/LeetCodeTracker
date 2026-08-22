@@ -346,13 +346,45 @@ app.get('/api/user-fallback/:username', async (req, res) => {
 // ==========================================
 // Global Chat Backend Storage & APIs
 // ==========================================
-const CHAT_FILE = path.join(__dirname, 'chat_storage.json');
+function getChatFilePath() {
+  const possibleDirs = [
+    process.env.DATA_DIR,
+    process.env.RENDER_DISK_PATH,
+    '/var/data',
+    __dirname
+  ].filter(Boolean);
+
+  for (const dir of possibleDirs) {
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const testFile = path.join(dir, `.write_test_${Date.now()}`);
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      return path.join(dir, 'chat_storage.json');
+    } catch (e) {
+      continue;
+    }
+  }
+  return path.join(__dirname, 'chat_storage.json');
+}
+
+const CHAT_FILE = getChatFilePath();
+console.log(`[Chat System] Initialized storage at: ${CHAT_FILE}`);
+
 let globalChatMessages = [];
 
 try {
   if (fs.existsSync(CHAT_FILE)) {
     const rawData = fs.readFileSync(CHAT_FILE, 'utf8');
     globalChatMessages = JSON.parse(rawData);
+  } else {
+    const localBackup = path.join(__dirname, 'chat_storage.json');
+    if (fs.existsSync(localBackup)) {
+      const rawData = fs.readFileSync(localBackup, 'utf8');
+      globalChatMessages = JSON.parse(rawData);
+    }
   }
 } catch (e) {
   console.error('Failed to load chat history from disk:', e.message);
@@ -362,6 +394,12 @@ try {
 function saveChatStorage() {
   try {
     fs.writeFileSync(CHAT_FILE, JSON.stringify(globalChatMessages, null, 2), 'utf8');
+    const localBackup = path.join(__dirname, 'chat_storage.json');
+    if (CHAT_FILE !== localBackup) {
+      try {
+        fs.writeFileSync(localBackup, JSON.stringify(globalChatMessages, null, 2), 'utf8');
+      } catch (e) {}
+    }
   } catch (e) {
     console.error('Failed to save chat storage to disk:', e.message);
   }

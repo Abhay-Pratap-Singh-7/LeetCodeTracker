@@ -445,18 +445,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function formatLocalDateKey(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const dateObj = typeof d === 'number' ? new Date(d) : (d || new Date());
+    const y = dateObj.getUTCFullYear();
+    const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   }
 
   function formatUTCToDateKey(ts) {
     const date = new Date(parseInt(ts, 10) * 1000);
-    const y = date.getUTCFullYear();
-    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const d = String(date.getUTCDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return formatLocalDateKey(date);
   }
 
   function parseSubmissionCalendar(rawCalendarData) {
@@ -551,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const today = new Date();
-    const currentYear = today.getFullYear();
+    const currentYear = today.getUTCFullYear();
     const todayDateKey = formatLocalDateKey(today);
 
     for (let m = 0; m < 12; m++) {
@@ -561,8 +559,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const monthGrid = document.createElement('div');
       monthGrid.className = 'month-grid';
 
-      const firstDayOfMonth = new Date(currentYear, m, 1);
-      const startDayOfWeek = firstDayOfMonth.getDay();
+      const firstDayOfMonth = new Date(Date.UTC(currentYear, m, 1));
+      const startDayOfWeek = firstDayOfMonth.getUTCDay();
 
       for (let p = 0; p < startDayOfWeek; p++) {
         const placeholder = document.createElement('div');
@@ -570,11 +568,11 @@ document.addEventListener('DOMContentLoaded', () => {
         monthGrid.appendChild(placeholder);
       }
 
-      const daysInMonth = new Date(currentYear, m + 1, 0).getDate();
+      const daysInMonth = new Date(Date.UTC(currentYear, m + 1, 0)).getUTCDate();
       for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
-        const d = new Date(currentYear, m, dayNum);
+        const d = new Date(Date.UTC(currentYear, m, dayNum));
         const dateKey = formatLocalDateKey(d);
-        const formattedDateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const formattedDateStr = d.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
         const count = parsedCalendar[dateKey] || 0;
         const isFuture = dateKey > todayDateKey;
 
@@ -677,19 +675,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const today = new Date();
-    const currentDayOfWeek = today.getDay();
+    const currentDayOfWeek = today.getUTCDay();
     const diffToMon = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
 
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diffToMon);
+    const monday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + diffToMon));
 
     const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const weekData = [];
     let totalAcceptedThisWeek = 0;
 
     for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
+      const d = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + i));
       const dateKey = formatLocalDateKey(d);
       const count = acceptedCountByDate[dateKey] || 0;
       totalAcceptedThisWeek += count;
@@ -876,14 +872,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.innerHTML = '';
 
-    const startDate = new Date(2026, 7, 21); // Aug 21, 2026
-    const endDate = new Date(); // Current date
+    const startDate = new Date(Date.UTC(2026, 7, 21)); // Aug 21, 2026 UTC
+    const todayStr = formatLocalDateKey(new Date());
 
     const targetDateList = [];
     let cur = new Date(startDate);
-    while (cur <= endDate) {
+    while (formatLocalDateKey(cur) <= todayStr) {
       targetDateList.push(new Date(cur));
-      cur.setDate(cur.getDate() + 1);
+      cur.setUTCDate(cur.getUTCDate() + 1);
     }
 
     state.savedMembers.forEach(member => {
@@ -909,7 +905,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalCount = Math.max(calendarCount, recentCount);
 
         if (totalCount === 0) {
-          const formattedStr = targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+          const formattedStr = targetDate.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
           missedDates.push(formattedStr);
         }
       });
@@ -1059,13 +1055,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const today = new Date();
     const todayStr = formatLocalDateKey(today);
 
-    const diffToMon = today.getDay() === 0 ? -6 : 1 - today.getDay();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diffToMon);
+    const diffToMon = today.getUTCDay() === 0 ? -6 : 1 - today.getUTCDay();
+    const monday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + diffToMon));
     const mondayStr = formatLocalDateKey(monday);
 
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth();
+    const currentYear = today.getUTCFullYear();
+    const currentMonth = today.getUTCMonth();
 
     const dailyMetrics = [];
     const weeklyMetrics = [];
@@ -1089,8 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Calculate Weekly Count (Mon to Today)
       let weekCount = 0;
       for (let i = 0; i < 7; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
+        const d = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + i));
         const dKey = formatLocalDateKey(d);
         if (dKey <= todayStr) {
           const recC = recentSubmissions.filter(s => s.timestamp && formatLocalDateKey(new Date(parseInt(s.timestamp, 10) * 1000)) === dKey).length;
@@ -1103,9 +1097,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Calculate Monthly Count
       let monthCount = 0;
-      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const daysInMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate();
       for (let day = 1; day <= daysInMonth; day++) {
-        const d = new Date(currentYear, currentMonth, day);
+        const d = new Date(Date.UTC(currentYear, currentMonth, day));
         const dKey = formatLocalDateKey(d);
         if (dKey <= todayStr) {
           const recC = recentSubmissions.filter(s => s.timestamp && formatLocalDateKey(new Date(parseInt(s.timestamp, 10) * 1000)) === dKey).length;
@@ -1284,5 +1278,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // Start initial sync and live background polling every 3s
   fetchGlobalChat();
   setInterval(fetchGlobalChat, 3000);
+
+  // Monitor 05:30 AM IST (00:00 UTC) LeetCode day rollover and refresh automatically
+  let currentLeetCodeDayKey = formatLocalDateKey(new Date());
+  setInterval(() => {
+    const newDayKey = formatLocalDateKey(new Date());
+    if (newDayKey !== currentLeetCodeDayKey) {
+      currentLeetCodeDayKey = newDayKey;
+      if (state.activeView === 'daily') {
+        loadDailyTrackData();
+      } else if (state.activeView === 'warnings') {
+        loadWarningsData();
+      } else if (state.activeView === 'team') {
+        loadTeamData();
+      }
+    }
+  }, 10000);
 
 });
