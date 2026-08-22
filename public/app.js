@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (chatSendForm) {
-      chatSendForm.addEventListener('submit', (e) => {
+      chatSendForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const text = chatInputText.value.trim();
 
@@ -222,17 +222,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!text) return;
 
-        const newMsg = {
-          id: Date.now(),
-          senderUsername: state.activeChatSender,
-          text: text,
-          timestamp: new Date().toISOString()
-        };
-
-        state.chatMessages.push(newMsg);
-        localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
         chatInputText.value = '';
-        renderGlobalChat();
+
+        try {
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              senderUsername: state.activeChatSender,
+              text: text
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data.messages)) {
+              state.chatMessages = data.messages;
+              localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
+              renderGlobalChat();
+            }
+          } else {
+            const fallbackMsg = {
+              id: 'msg_' + Date.now(),
+              senderUsername: state.activeChatSender,
+              text: text,
+              timestamp: new Date().toISOString()
+            };
+            state.chatMessages.push(fallbackMsg);
+            localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
+            renderGlobalChat();
+          }
+        } catch (err) {
+          const fallbackMsg = {
+            id: 'msg_' + Date.now(),
+            senderUsername: state.activeChatSender,
+            text: text,
+            timestamp: new Date().toISOString()
+          };
+          state.chatMessages.push(fallbackMsg);
+          localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
+          renderGlobalChat();
+        }
       });
     }
 
@@ -313,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateActiveIdentityUI();
       }
 
+      fetchGlobalChat();
       renderGlobalChat();
     }
     if (window.lucide) window.lucide.createIcons();
@@ -1222,5 +1253,29 @@ document.addEventListener('DOMContentLoaded', () => {
       dashboardView.classList.remove('hidden');
     }
   }
+
+  // Sync and live-refresh global chat from backend
+  async function fetchGlobalChat() {
+    try {
+      const res = await fetch('/api/chat');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.messages)) {
+          const isDifferent = JSON.stringify(data.messages) !== JSON.stringify(state.chatMessages);
+          state.chatMessages = data.messages;
+          localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
+          if (isDifferent) {
+            renderGlobalChat();
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Global chat sync error:', err);
+    }
+  }
+
+  // Start initial sync and live background polling every 3s
+  fetchGlobalChat();
+  setInterval(fetchGlobalChat, 3000);
 
 });

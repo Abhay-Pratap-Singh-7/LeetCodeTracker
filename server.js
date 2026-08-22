@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -340,6 +341,63 @@ app.get('/api/user-fallback/:username', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user data: ' + err.message });
   }
+});
+
+// ==========================================
+// Global Chat Backend Storage & APIs
+// ==========================================
+const CHAT_FILE = path.join(__dirname, 'chat_storage.json');
+let globalChatMessages = [];
+
+try {
+  if (fs.existsSync(CHAT_FILE)) {
+    const rawData = fs.readFileSync(CHAT_FILE, 'utf8');
+    globalChatMessages = JSON.parse(rawData);
+  }
+} catch (e) {
+  console.error('Failed to load chat history from disk:', e.message);
+  globalChatMessages = [];
+}
+
+function saveChatStorage() {
+  try {
+    fs.writeFileSync(CHAT_FILE, JSON.stringify(globalChatMessages, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Failed to save chat storage to disk:', e.message);
+  }
+}
+
+// GET /api/chat - Fetch all global chat messages
+app.get('/api/chat', (req, res) => {
+  res.json({ messages: globalChatMessages });
+});
+
+// POST /api/chat - Save new message to global chat backend
+app.post('/api/chat', (req, res) => {
+  const { senderUsername, text } = req.body || {};
+  if (!senderUsername || !text || !text.trim()) {
+    return res.status(400).json({ error: 'senderUsername and text are required' });
+  }
+
+  const newMsg = {
+    id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    senderUsername: senderUsername.trim(),
+    text: text.trim(),
+    timestamp: new Date().toISOString()
+  };
+
+  globalChatMessages.push(newMsg);
+  if (globalChatMessages.length > 1000) {
+    globalChatMessages = globalChatMessages.slice(-1000);
+  }
+
+  saveChatStorage();
+
+  res.status(201).json({
+    success: true,
+    message: newMsg,
+    messages: globalChatMessages
+  });
 });
 
 app.listen(PORT, () => {
