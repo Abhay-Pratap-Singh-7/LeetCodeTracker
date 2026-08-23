@@ -15,7 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     { username: '_palakdeep', name: 'Palakdeep', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
     { username: '18WAgXvMr1', name: 'Abhay', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
     { username: 'I2pULBxMMM', name: 'Akhilesh', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: 'janhavi0411', name: 'Janhavi', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' }
+    { username: 'janhavi0411', name: 'Janhavi', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
+    { username: 'VanshPal46', name: 'Vansh', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' }
   ];
 
   let savedMembers = DEFAULT_TEAM;
