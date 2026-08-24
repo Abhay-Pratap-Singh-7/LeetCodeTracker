@@ -355,21 +355,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchDailyQuestion() {
     const qTitleEl = document.getElementById('daily-q-title');
-    const qBtnEl = document.getElementById('btn-daily-question');
-    if (!qTitleEl || !qBtnEl) return;
+    const popoverTitleEl = document.getElementById('daily-popover-title');
+    const popoverDiffEl = document.getElementById('daily-popover-diff');
+    const popoverDateEl = document.getElementById('daily-popover-date');
+    const popoverAcEl = document.getElementById('daily-popover-ac');
+    const popoverTagsEl = document.getElementById('daily-popover-tags');
+    const popoverLinkEl = document.getElementById('daily-popover-link');
 
     try {
       const res = await fetch('/api/daily-question');
       if (res.ok) {
         const data = await res.json();
         if (data && data.title && data.url) {
-          qTitleEl.textContent = data.title;
-          qBtnEl.href = data.url;
-          qBtnEl.target = '_blank';
-          if (data.difficulty) {
+          if (qTitleEl) qTitleEl.textContent = data.title;
+          if (popoverTitleEl) popoverTitleEl.textContent = data.title;
+
+          if (popoverDiffEl && data.difficulty) {
             const diffClass = data.difficulty.toLowerCase();
-            qTitleEl.className = `daily-q-title diff-${diffClass}`;
+            popoverDiffEl.textContent = data.difficulty;
+            popoverDiffEl.className = `daily-popover-diff diff-${diffClass}`;
+            if (qTitleEl) qTitleEl.className = `daily-q-title diff-${diffClass}`;
           }
+
+          if (popoverDateEl) {
+            popoverDateEl.innerHTML = `<i data-lucide="calendar" style="width: 13px; height: 13px;"></i> ${data.date || 'Today'}`;
+          }
+
+          if (popoverAcEl) {
+            popoverAcEl.innerHTML = `<i data-lucide="check-circle-2" style="width: 13px; height: 13px;"></i> AC Rate: ${data.acRate || 'N/A'}`;
+          }
+
+          if (popoverTagsEl && Array.isArray(data.topicTags) && data.topicTags.length > 0) {
+            popoverTagsEl.innerHTML = data.topicTags.map(t => `<span class="tag-pill">${t}</span>`).join('');
+          }
+
+          if (popoverLinkEl) {
+            popoverLinkEl.href = data.url;
+            popoverLinkEl.target = '_blank';
+          }
+          if (window.lucide) window.lucide.createIcons();
         }
       }
     } catch (e) {
@@ -642,9 +666,49 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  async function loadDailyTrackData() {
+  function populateDailyTrackDateOptions() {
+    const selectEl = document.getElementById('daily-track-date-select');
+    if (!selectEl) return;
+
+    if (selectEl.options.length === 0) {
+      const today = new Date();
+      const optionsHTML = [];
+
+      for (let i = 0; i < 8; i++) {
+        const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
+        const dateKey = formatLocalDateKey(d);
+        const formattedStr = d.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric' });
+        
+        let label = formattedStr;
+        if (i === 0) label = `Today (${formattedStr})`;
+        else if (i === 1) label = `Yesterday (${formattedStr})`;
+        else label = `${i} Days Ago (${formattedStr})`;
+
+        optionsHTML.push(`<option value="${dateKey}">${label}</option>`);
+      }
+
+      selectEl.innerHTML = optionsHTML.join('');
+      selectEl.addEventListener('change', () => {
+        loadDailyTrackData(selectEl.value);
+      });
+    }
+  }
+
+  async function loadDailyTrackData(targetDateKey) {
+    populateDailyTrackDateOptions();
+
     const container = document.getElementById('daily-track-cards-container');
     if (!container) return;
+
+    const selectEl = document.getElementById('daily-track-date-select');
+    const chosenDateKey = targetDateKey || (selectEl ? selectEl.value : null) || formatLocalDateKey(new Date());
+
+    if (selectEl && targetDateKey && selectEl.value !== targetDateKey) {
+      selectEl.value = targetDateKey;
+    }
+
+    const todayStr = formatLocalDateKey(new Date());
+    const isToday = chosenDateKey === todayStr;
 
     container.innerHTML = `
       <div class="daily-shimmer-card"></div>
@@ -672,17 +736,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.innerHTML = '';
 
-    const todayStr = formatLocalDateKey(new Date());
-
     state.savedMembers.forEach(member => {
       if (!member || !member.username) return;
       const data = state.teamData[member.username];
       const allSubmissions = data?.recentSubmissions || [];
 
-      const todaySubmissions = allSubmissions.filter(sub => {
+      const filteredSubmissions = allSubmissions.filter(sub => {
         if (!sub.timestamp) return false;
         const subDateStr = formatLocalDateKey(new Date(parseInt(sub.timestamp, 10) * 1000));
-        return subDateStr === todayStr;
+        return subDateStr === chosenDateKey;
       });
 
       const card = document.createElement('div');
@@ -692,18 +754,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const avatarUrl = member.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg';
 
       let problemsHTML = '';
-      if (todaySubmissions.length === 0) {
-        problemsHTML = `<div style="font-size: 0.88rem; color: var(--text-light); font-weight: 600; text-align: center; padding: 18px 0; background: var(--bg-shell); border-radius: var(--radius-md);">no problem solved till now</div>`;
+      if (filteredSubmissions.length === 0) {
+        const emptyMsg = isToday ? 'no problem solved till now' : 'no problem solved on this day';
+        problemsHTML = `<div style="font-size: 0.88rem; color: var(--text-light); font-weight: 600; text-align: center; padding: 18px 0; background: var(--bg-shell); border-radius: var(--radius-md);">${emptyMsg}</div>`;
       } else {
-        todaySubmissions.forEach(sub => {
+        filteredSubmissions.forEach(sub => {
           const timeStr = new Date(parseInt(sub.timestamp, 10) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const problemUrl = sub.url || `https://leetcode.com/problems/${sub.titleSlug}/`;
+          const diffClass = sub.difficulty ? sub.difficulty.toLowerCase() : 'easy';
+          const diffLabel = sub.difficulty || 'Easy';
 
           problemsHTML += `
             <div class="daily-problem-item">
-              <div class="daily-problem-title">
-                <i data-lucide="check-circle-2" style="width: 16px; height: 16px; color: var(--primary-green);"></i>
-                <a href="${problemUrl}" target="_blank" style="color: var(--text-dark); text-decoration: none;">${sub.title}</a>
+              <div class="daily-problem-left">
+                <i data-lucide="check-circle-2" style="width: 16px; height: 16px; color: var(--primary-green); flex-shrink: 0;"></i>
+                <a href="${problemUrl}" target="_blank" class="daily-problem-link">${sub.title}</a>
+                <span class="problem-diff-pill diff-${diffClass}">${diffLabel}</span>
               </div>
               <span class="daily-problem-time">${timeStr}</span>
             </div>
@@ -720,7 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="daily-member-handle">@${member.username}</div>
             </div>
           </div>
-          <span class="daily-badge-count" style="${todaySubmissions.length === 0 ? 'background: #f1f5f9; color: var(--text-light);' : ''}">${todaySubmissions.length} Solved Today</span>
+          <span class="daily-badge-count" style="${filteredSubmissions.length === 0 ? 'background: #f1f5f9; color: var(--text-light);' : ''}">${filteredSubmissions.length} Solved</span>
         </div>
         <div class="daily-problems-list">
           ${problemsHTML}

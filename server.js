@@ -35,6 +35,29 @@ async function fetchLeetCodeGraphQL(query, variables) {
   return data.data;
 }
 
+const problemDifficultyCache = new Map();
+
+async function getDifficultyForSlug(titleSlug) {
+  if (!titleSlug) return 'Medium';
+  if (problemDifficultyCache.has(titleSlug)) {
+    return problemDifficultyCache.get(titleSlug);
+  }
+  try {
+    const qData = await fetchLeetCodeGraphQL(`
+      query getDiff($titleSlug: String!) {
+        question(titleSlug: $titleSlug) {
+          difficulty
+        }
+      }
+    `, { titleSlug });
+    const diff = qData?.question?.difficulty || 'Medium';
+    problemDifficultyCache.set(titleSlug, diff);
+    return diff;
+  } catch (e) {
+    return 'Medium';
+  }
+}
+
 // Endpoint to fetch complete user data in a single call
 app.get('/api/user/:username', async (req, res) => {
   const username = req.params.username;
@@ -214,6 +237,17 @@ app.get('/api/user/:username', async (req, res) => {
       }
     }
 
+    const formattedRecentSubmissions = await Promise.all(
+      recentSubmissions.map(async s => ({
+        id: s.id,
+        title: s.title,
+        titleSlug: s.titleSlug,
+        timestamp: s.timestamp,
+        difficulty: await getDifficultyForSlug(s.titleSlug),
+        url: `https://leetcode.com/problems/${s.titleSlug}/`
+      }))
+    );
+
     const payload = {
       username: matchedUser.username,
       name: matchedUser.profile?.realName || matchedUser.username,
@@ -262,13 +296,7 @@ app.get('/api/user/:username', async (req, res) => {
       badges: matchedUser.badges || [],
       activeBadge: matchedUser.activeBadge || null,
       submissionCalendar: calendar,
-      recentSubmissions: recentSubmissions.map(s => ({
-        id: s.id,
-        title: s.title,
-        titleSlug: s.titleSlug,
-        timestamp: s.timestamp,
-        url: `https://leetcode.com/problems/${s.titleSlug}/`
-      })),
+      recentSubmissions: formattedRecentSubmissions,
       skills: skillTags
     };
 
@@ -356,6 +384,11 @@ app.get('/api/daily-question', async (req, res) => {
           title
           titleSlug
           difficulty
+          acRate
+          topicTags {
+            name
+            slug
+          }
         }
       }
     }
@@ -368,7 +401,9 @@ app.get('/api/daily-question', async (req, res) => {
       return res.json({
         title: 'LeetCode Daily Challenge',
         url: 'https://leetcode.com/problemset/all/',
-        difficulty: 'Medium'
+        difficulty: 'Medium',
+        acRate: '50.0%',
+        topicTags: ['Algorithms']
       });
     }
 
@@ -377,8 +412,11 @@ app.get('/api/daily-question', async (req, res) => {
     res.json({
       date: daily.date,
       title: `${qNum}${q.title}`,
+      rawTitle: q.title,
       titleSlug: q.titleSlug,
       difficulty: q.difficulty || 'Medium',
+      acRate: q.acRate ? `${q.acRate.toFixed(1)}%` : 'N/A',
+      topicTags: (q.topicTags || []).map(t => t.name),
       url: `https://leetcode.com${daily.link || `/problems/${q.titleSlug}/`}`
     });
   } catch (err) {
@@ -386,7 +424,9 @@ app.get('/api/daily-question', async (req, res) => {
     res.json({
       title: 'LeetCode Daily Challenge',
       url: 'https://leetcode.com/problemset/all/',
-      difficulty: 'Medium'
+      difficulty: 'Medium',
+      acRate: '50.0%',
+      topicTags: ['Algorithms']
     });
   }
 });

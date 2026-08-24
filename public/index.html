@@ -93,14 +93,43 @@
 
         <!-- LeetCode Daily Question Option -->
         <div class="header-daily-question">
-          <a id="btn-daily-question" href="https://leetcode.com/problemset/all/" target="_blank" class="daily-question-badge" title="Solve LeetCode Daily Challenge">
+          <div id="btn-daily-question" class="daily-question-badge">
             <span class="daily-q-fire"><i data-lucide="flame"></i></span>
             <div class="daily-q-text">
               <span class="daily-q-tag">Daily Question</span>
               <strong id="daily-q-title" class="daily-q-title">LeetCode Daily Challenge</strong>
             </div>
-            <i data-lucide="external-link" class="daily-q-arrow"></i>
-          </a>
+            <i data-lucide="chevron-down" class="daily-q-arrow"></i>
+          </div>
+
+          <!-- Hover Details Popover Box -->
+          <div id="daily-q-popover" class="daily-q-popover">
+            <div class="daily-popover-header">
+              <div class="daily-popover-badge-row">
+                <span class="daily-popover-tag"><i data-lucide="sparkles" style="width: 11px; height: 11px;"></i> Daily Challenge</span>
+                <span id="daily-popover-diff" class="daily-popover-diff diff-medium">Medium</span>
+              </div>
+              <h3 id="daily-popover-title" class="daily-popover-title">LeetCode Daily Challenge</h3>
+              <div id="daily-popover-meta" class="daily-popover-meta">
+                <span id="daily-popover-date" class="meta-item"><i data-lucide="calendar" style="width: 13px; height: 13px;"></i> Today</span>
+                <span id="daily-popover-ac" class="meta-item"><i data-lucide="check-circle-2" style="width: 13px; height: 13px;"></i> AC Rate: --</span>
+              </div>
+            </div>
+
+            <div class="daily-popover-body">
+              <span class="daily-popover-section-label">Topics</span>
+              <div id="daily-popover-tags" class="daily-popover-tags">
+                <span class="tag-pill">Algorithms</span>
+              </div>
+            </div>
+
+            <div class="daily-popover-footer">
+              <a id="daily-popover-link" href="https://leetcode.com/problemset/all/" target="_blank" class="daily-solve-btn">
+                <span>Solve Problem Now</span>
+                <i data-lucide="arrow-right" style="width: 15px; height: 15px;"></i>
+              </a>
+            </div>
+          </div>
         </div>
 
         <div class="header-user-profile">
@@ -156,6 +185,10 @@
               <p class="page-sub">Real-time daily problem solving log across all team members.</p>
             </div>
             <div class="page-actions">
+              <div class="date-select-wrapper">
+                <i data-lucide="calendar" class="date-select-ic"></i>
+                <select id="daily-track-date-select" class="date-select-dropdown" title="Select date to view solved problems"></select>
+              </div>
               <button id="btn-refresh-daily" class="btn-primary-green">
                 <i data-lucide="rotate-cw"></i> Refresh Activity
               </button>
