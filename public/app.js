@@ -141,16 +141,28 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const username = usernameInput.value.trim();
       if (username) {
-        loadUserData(username);
         switchView('single');
+        loadUserData(username);
       }
     });
+
+    const searchIc = searchForm ? searchForm.querySelector('.search-ic') : null;
+    if (searchIc) {
+      searchIc.style.cursor = 'pointer';
+      searchIc.addEventListener('click', () => {
+        const username = usernameInput.value.trim();
+        if (username) {
+          switchView('single');
+          loadUserData(username);
+        }
+      });
+    }
 
     if (btnAddMember) {
       btnAddMember.addEventListener('click', () => {
         if (!state.currentUser) return;
         const user = state.currentUser;
-        const exists = state.savedMembers.some(m => m.username === user.username);
+        const exists = state.savedMembers.some(m => m.username.toLowerCase() === user.username.toLowerCase());
         if (!exists) {
           state.savedMembers.push({
             username: user.username,
@@ -176,8 +188,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnRetry.addEventListener('click', () => {
       const username = usernameInput.value.trim() || '18WAgXvMr1';
+      switchView('single');
       loadUserData(username);
     });
+  }
+
+  function showShimmerLoading() {
+    if (shimmerLoadingState) shimmerLoadingState.classList.remove('hidden');
+    if (dashboardView) dashboardView.classList.add('hidden');
+    if (errorState) errorState.classList.add('hidden');
+  }
+
+  function showContent() {
+    if (shimmerLoadingState) shimmerLoadingState.classList.add('hidden');
+    if (errorState) errorState.classList.add('hidden');
+    if (dashboardView) dashboardView.classList.remove('hidden');
+  }
+
+  function showError(msg) {
+    if (shimmerLoadingState) shimmerLoadingState.classList.add('hidden');
+    if (dashboardView) dashboardView.classList.add('hidden');
+    if (errorState) {
+      errorState.classList.remove('hidden');
+      if (errorMsg) errorMsg.textContent = msg || 'Could not fetch details for this username.';
+    }
   }
 
   function switchView(view) {
@@ -227,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.savedMembers.forEach(member => {
       if (!member || !member.username) return;
       const item = document.createElement('div');
-      const isActive = state.currentUser && state.currentUser.username === member.username;
+      const isActive = state.currentUser && state.currentUser.username.toLowerCase() === member.username.toLowerCase();
       item.className = `sidebar-member-item ${isActive ? 'active' : ''}`;
 
       const displayName = member.name || member.username;
@@ -243,8 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       item.addEventListener('click', () => {
         usernameInput.value = member.username;
+        switchView('single');
         loadUserData(member.username);
-        if (state.activeView !== 'single') switchView('single');
         closeMobileSidebar();
       });
 
@@ -286,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.currentUser = data;
       state.teamData[username] = data;
 
-      const memberIdx = state.savedMembers.findIndex(m => m && m.username === username);
+      const memberIdx = state.savedMembers.findIndex(m => m && m.username.toLowerCase() === username.toLowerCase());
       if (memberIdx !== -1) {
         state.savedMembers[memberIdx].name = data.name || username;
         state.savedMembers[memberIdx].avatar = data.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg';
