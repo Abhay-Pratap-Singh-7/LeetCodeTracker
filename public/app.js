@@ -51,23 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   localStorage.setItem('leetdash_saved_members_v2', JSON.stringify(savedMembers));
 
-  let activeChatSender = localStorage.getItem('leetdash_chat_sender_v1') || '';
-
-  let storedChat = localStorage.getItem('leetdash_global_chat_v1');
-  let chatMessages = [];
-  if (storedChat) {
-    try {
-      const parsedChat = JSON.parse(storedChat);
-      if (Array.isArray(parsedChat)) chatMessages = parsedChat;
-    } catch (e) {}
-  }
-
   const state = {
     currentUser: null,
     savedMembers: savedMembers,
     teamData: {},
-    activeChatSender: activeChatSender,
-    chatMessages: chatMessages,
     activeView: 'daily',
     charts: {
       pieProgress: null
@@ -93,24 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const menuViewTeam = document.getElementById('menu-view-team');
   const menuViewDaily = document.getElementById('menu-view-daily');
   const menuViewWarnings = document.getElementById('menu-view-warnings');
-  const menuViewChat = document.getElementById('menu-view-chat');
 
   const dashboardView = document.getElementById('dashboard-view');
   const teamView = document.getElementById('team-view');
   const dailyTrackView = document.getElementById('daily-track-view');
   const warningsView = document.getElementById('warnings-view');
-  const globalChatView = document.getElementById('global-chat-view');
-
-  const chatIdentityModal = document.getElementById('chat-identity-modal');
-  const modalSenderSelect = document.getElementById('modal-sender-select');
-  const btnSaveChatIdentity = document.getElementById('btn-save-chat-identity');
-  const btnSwitchIdentity = document.getElementById('btn-switch-identity');
-  const chatActiveName = document.getElementById('chat-active-name');
-  const chatActiveAvatar = document.getElementById('chat-active-avatar');
-
-  const chatSendForm = document.getElementById('chat-send-form');
-  const chatInputText = document.getElementById('chat-input-text');
-  const chatMessagesBody = document.getElementById('chat-messages-body');
 
   const shimmerLoadingState = document.getElementById('shimmer-loading-state');
   const errorState = document.getElementById('error-state');
@@ -193,7 +167,6 @@ document.addEventListener('DOMContentLoaded', () => {
     menuViewTeam.addEventListener('click', () => { switchView('team'); closeMobileSidebar(); });
     if (menuViewDaily) menuViewDaily.addEventListener('click', () => { switchView('daily'); closeMobileSidebar(); });
     if (menuViewWarnings) menuViewWarnings.addEventListener('click', () => { switchView('warnings'); closeMobileSidebar(); });
-    if (menuViewChat) menuViewChat.addEventListener('click', () => { switchView('chat'); closeMobileSidebar(); });
 
     if (btnToggleView) btnToggleView.addEventListener('click', () => switchView('team'));
     if (btnBackProfile) btnBackProfile.addEventListener('click', () => switchView('single'));
@@ -201,111 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnRefreshDaily) btnRefreshDaily.addEventListener('click', () => loadDailyTrackData());
     if (btnRefreshWarnings) btnRefreshWarnings.addEventListener('click', () => loadWarningsData());
 
-    if (btnSwitchIdentity) {
-      btnSwitchIdentity.addEventListener('click', () => openIdentityModal());
-    }
-
-    if (btnSaveChatIdentity) {
-      btnSaveChatIdentity.addEventListener('click', () => {
-        const selected = modalSenderSelect.value;
-        if (selected) {
-          state.activeChatSender = selected;
-          localStorage.setItem('leetdash_chat_sender_v1', selected);
-          updateActiveIdentityUI();
-          chatIdentityModal.classList.add('hidden');
-          renderGlobalChat();
-        }
-      });
-    }
-
-    if (chatSendForm) {
-      chatSendForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const text = chatInputText.value.trim();
-
-        if (!state.activeChatSender) {
-          openIdentityModal();
-          return;
-        }
-
-        if (!text) return;
-
-        chatInputText.value = '';
-
-        try {
-          const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              senderUsername: state.activeChatSender,
-              text: text
-            })
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data && Array.isArray(data.messages)) {
-              state.chatMessages = data.messages;
-              localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
-              renderGlobalChat();
-            }
-          } else {
-            const fallbackMsg = {
-              id: 'msg_' + Date.now(),
-              senderUsername: state.activeChatSender,
-              text: text,
-              timestamp: new Date().toISOString()
-            };
-            state.chatMessages.push(fallbackMsg);
-            localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
-            renderGlobalChat();
-          }
-        } catch (err) {
-          const fallbackMsg = {
-            id: 'msg_' + Date.now(),
-            senderUsername: state.activeChatSender,
-            text: text,
-            timestamp: new Date().toISOString()
-          };
-          state.chatMessages.push(fallbackMsg);
-          localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
-          renderGlobalChat();
-        }
-      });
-    }
-
     btnRetry.addEventListener('click', () => {
       const username = usernameInput.value.trim() || '18WAgXvMr1';
       loadUserData(username);
     });
-  }
-
-  function openIdentityModal() {
-    if (!modalSenderSelect) return;
-    modalSenderSelect.innerHTML = '';
-
-    state.savedMembers.forEach(member => {
-      if (!member || !member.username) return;
-      const opt = document.createElement('option');
-      opt.value = member.username;
-      opt.textContent = `${member.name || member.username} (@${member.username})`;
-      if (state.activeChatSender === member.username) opt.selected = true;
-      modalSenderSelect.appendChild(opt);
-    });
-
-    chatIdentityModal.classList.remove('hidden');
-    if (window.lucide) window.lucide.createIcons();
-  }
-
-  function updateActiveIdentityUI() {
-    const member = state.savedMembers.find(m => m.username === state.activeChatSender);
-    if (member) {
-      if (chatActiveName) chatActiveName.textContent = member.name || member.username;
-      if (chatActiveAvatar) chatActiveAvatar.src = member.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg';
-    } else {
-      if (chatActiveName) chatActiveName.textContent = 'Select Profile';
-      if (chatActiveAvatar) chatActiveAvatar.src = 'https://assets.leetcode.com/users/default_avatar.jpg';
-    }
   }
 
   function switchView(view) {
@@ -314,13 +186,11 @@ document.addEventListener('DOMContentLoaded', () => {
     menuViewTeam.classList.remove('active');
     if (menuViewDaily) menuViewDaily.classList.remove('active');
     if (menuViewWarnings) menuViewWarnings.classList.remove('active');
-    if (menuViewChat) menuViewChat.classList.remove('active');
 
     dashboardView.classList.add('hidden');
     teamView.classList.add('hidden');
     if (dailyTrackView) dailyTrackView.classList.add('hidden');
     if (warningsView) warningsView.classList.add('hidden');
-    if (globalChatView) globalChatView.classList.add('hidden');
 
     if (view === 'single') {
       menuViewProfile.classList.add('active');
@@ -341,18 +211,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (menuViewWarnings) menuViewWarnings.classList.add('active');
       if (warningsView) warningsView.classList.remove('hidden');
       loadWarningsData();
-    } else if (view === 'chat') {
-      if (menuViewChat) menuViewChat.classList.add('active');
-      if (globalChatView) globalChatView.classList.remove('hidden');
-
-      if (!state.activeChatSender) {
-        openIdentityModal();
-      } else {
-        updateActiveIdentityUI();
-      }
-
-      fetchGlobalChat();
-      renderGlobalChat();
     }
     if (window.lucide) window.lucide.createIcons();
   }
@@ -495,10 +353,42 @@ document.addEventListener('DOMContentLoaded', () => {
     return '4';
   }
 
+  async function fetchDailyQuestion() {
+    const qTitleEl = document.getElementById('daily-q-title');
+    const qBtnEl = document.getElementById('btn-daily-question');
+    if (!qTitleEl || !qBtnEl) return;
+
+    try {
+      const res = await fetch('/api/daily-question');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.title && data.url) {
+          qTitleEl.textContent = data.title;
+          qBtnEl.href = data.url;
+          qBtnEl.target = '_blank';
+          if (data.difficulty) {
+            const diffClass = data.difficulty.toLowerCase();
+            qTitleEl.className = `daily-q-title diff-${diffClass}`;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Daily question fetch error:', e);
+    }
+  }
+
+  fetchDailyQuestion();
+
   function renderDashboard(data) {
     document.getElementById('header-user-avatar').src = data.avatar;
     document.getElementById('header-user-name').textContent = data.name;
     document.getElementById('header-user-handle').textContent = `@${data.username}`;
+
+    const headerUserLink = document.getElementById('header-user-link');
+    if (headerUserLink) {
+      headerUserLink.href = `https://leetcode.com/u/${data.username}/`;
+      headerUserLink.target = '_blank';
+    }
 
     const stats = data.stats;
     document.getElementById('stat-total-solved').textContent = stats.totalSolved.toLocaleString();
@@ -1148,137 +1038,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function extractLeetCodeSlug(text) {
-    const regex = /https:\/\/leetcode\.com\/problems\/([a-zA-Z0-9-]+)/i;
-    const match = text.match(regex);
-    return match ? match[1].replace(/\/$/, '') : null;
-  }
 
-  function renderGlobalChat() {
-    if (!chatMessagesBody) return;
-    chatMessagesBody.innerHTML = '';
-
-    if (!state.chatMessages || state.chatMessages.length === 0) {
-      chatMessagesBody.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.88rem; padding: 60px 20px; font-weight: 600;">No messages yet. Start the conversation by typing a message or sharing a LeetCode problem link!</div>`;
-      return;
-    }
-
-    let lastSenderUsername = null;
-    let lastContentBox = null;
-
-    state.chatMessages.forEach(msg => {
-      const isMine = msg.senderUsername === state.activeChatSender;
-      const sender = state.savedMembers.find(m => m.username === msg.senderUsername) || {
-        username: msg.senderUsername,
-        name: msg.senderUsername,
-        avatar: 'https://assets.leetcode.com/users/default_avatar.jpg'
-      };
-
-      const timeStr = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-      const slug = extractLeetCodeSlug(msg.text);
-
-      let richCardHTML = '';
-      if (slug) {
-        const problemTitle = slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        const problemUrl = `https://leetcode.com/problems/${slug}/`;
-
-        richCardHTML = `
-          <div class="leetcode-rich-card">
-            <div class="leetcode-card-left">
-              <div class="leetcode-logo-badge">LC</div>
-              <div class="leetcode-card-info">
-                <a href="${problemUrl}" target="_blank" class="leetcode-card-title">${problemTitle}</a>
-                <span class="leetcode-card-slug">leetcode.com/problems/${slug}</span>
-              </div>
-            </div>
-            <a href="${problemUrl}" target="_blank" class="leetcode-card-link-btn">
-              <span>Solve Problem</span>
-              <i data-lucide="arrow-up-right" style="width: 15px; height: 15px;"></i>
-            </a>
-          </div>
-        `;
-      }
-
-      const bubbleHTML = `
-        <div class="chat-msg-bubble">
-          ${msg.text}
-          ${richCardHTML}
-        </div>
-      `;
-
-      if (lastSenderUsername === msg.senderUsername && lastContentBox) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = bubbleHTML;
-        lastContentBox.appendChild(tempDiv.firstElementChild);
-      } else {
-        lastSenderUsername = msg.senderUsername;
-        const msgItem = document.createElement('div');
-        msgItem.className = `chat-msg-item ${isMine ? 'mine' : 'other'}`;
-
-        msgItem.innerHTML = `
-          <img src="${sender.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg'}" class="chat-msg-avatar" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
-          <div class="chat-msg-content-box">
-            <div class="chat-msg-header">
-              <span class="chat-msg-author">${sender.name || sender.username}</span>
-              <span class="chat-msg-time">${timeStr}</span>
-            </div>
-            ${bubbleHTML}
-          </div>
-        `;
-
-        chatMessagesBody.appendChild(msgItem);
-        lastContentBox = msgItem.querySelector('.chat-msg-content-box');
-      }
-    });
-
-    chatMessagesBody.scrollTop = chatMessagesBody.scrollHeight;
-    if (window.lucide) window.lucide.createIcons();
-  }
-
-  function showShimmerLoading() {
-    if (shimmerLoadingState) shimmerLoadingState.classList.remove('hidden');
-    if (errorState) errorState.classList.add('hidden');
-    if (dashboardView) dashboardView.classList.add('hidden');
-  }
-
-  function showError(msg) {
-    if (errorMsg) errorMsg.textContent = msg;
-    if (shimmerLoadingState) shimmerLoadingState.classList.add('hidden');
-    if (errorState) errorState.classList.remove('hidden');
-    if (dashboardView) dashboardView.classList.add('hidden');
-  }
-
-  function showContent() {
-    if (shimmerLoadingState) shimmerLoadingState.classList.add('hidden');
-    if (errorState) errorState.classList.add('hidden');
-    if (state.activeView === 'single' && dashboardView) {
-      dashboardView.classList.remove('hidden');
-    }
-  }
-
-  // Sync and live-refresh global chat from backend
-  async function fetchGlobalChat() {
-    try {
-      const res = await fetch('/api/chat');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.messages)) {
-          const isDifferent = JSON.stringify(data.messages) !== JSON.stringify(state.chatMessages);
-          state.chatMessages = data.messages;
-          localStorage.setItem('leetdash_global_chat_v1', JSON.stringify(state.chatMessages));
-          if (isDifferent) {
-            renderGlobalChat();
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Global chat sync error:', err);
-    }
-  }
-
-  // Start initial sync and live background polling every 3s
-  fetchGlobalChat();
-  setInterval(fetchGlobalChat, 3000);
 
   // Monitor 05:30 AM IST (00:00 UTC) LeetCode day rollover and refresh automatically
   let currentLeetCodeDayKey = formatLocalDateKey(new Date());

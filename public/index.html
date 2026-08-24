@@ -25,23 +25,6 @@
     <i data-lucide="menu"></i>
   </button>
 
-  <!-- Chat Sender Identity Select Popup Modal -->
-  <div id="chat-identity-modal" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-icon">
-        <i data-lucide="user-check"></i>
-      </div>
-      <h2>Select Your Profile Identity</h2>
-      <p>Choose your profile to post messages in Global Team Chat. This preference will be saved locally.</p>
-      
-      <div class="modal-select-wrapper">
-        <select id="modal-sender-select" class="modal-dropdown"></select>
-      </div>
-
-      <button id="btn-save-chat-identity" class="btn-primary-green full-width-btn">Confirm Identity</button>
-    </div>
-  </div>
-
   <!-- Main Single Page Dashboard Shell -->
   <div class="dashboard-shell">
     
@@ -76,10 +59,6 @@
             <i data-lucide="alert-triangle"></i>
             <span>Warnings</span>
           </button>
-          <button id="menu-view-chat" class="sidebar-menu-btn">
-            <i data-lucide="message-square"></i>
-            <span>Global Chat</span>
-          </button>
         </div>
 
         <!-- Saved Members Section (Shifted Below View Modes) -->
@@ -112,14 +91,29 @@
           </form>
         </div>
 
-        <div class="header-user-profile">
-          <div class="user-badge-box">
-            <img id="header-user-avatar" src="https://assets.leetcode.com/users/default_avatar.jpg" alt="Avatar" class="user-avatar-small">
-            <div class="user-details">
-              <strong id="header-user-name">Loading...</strong>
-              <span id="header-user-handle">@username</span>
+        <!-- LeetCode Daily Question Option -->
+        <div class="header-daily-question">
+          <a id="btn-daily-question" href="https://leetcode.com/problemset/all/" target="_blank" class="daily-question-badge" title="Solve LeetCode Daily Challenge">
+            <span class="daily-q-fire"><i data-lucide="flame"></i></span>
+            <div class="daily-q-text">
+              <span class="daily-q-tag">Daily Question</span>
+              <strong id="daily-q-title" class="daily-q-title">LeetCode Daily Challenge</strong>
             </div>
-          </div>
+            <i data-lucide="external-link" class="daily-q-arrow"></i>
+          </a>
+        </div>
+
+        <div class="header-user-profile">
+          <a id="header-user-link" href="https://leetcode.com" target="_blank" class="user-badge-link" title="Open LeetCode Profile in New Tab">
+            <div class="user-badge-box">
+              <img id="header-user-avatar" src="https://assets.leetcode.com/users/default_avatar.jpg" alt="Avatar" class="user-avatar-small">
+              <div class="user-details">
+                <strong id="header-user-name">Loading...</strong>
+                <span id="header-user-handle">@username</span>
+              </div>
+              <i data-lucide="external-link" class="user-profile-ext-ic"></i>
+            </div>
+          </a>
         </div>
       </header>
 
@@ -471,42 +465,7 @@
 
         </div>
 
-        <!-- 5. GLOBAL CHAT VIEW -->
-        <div id="global-chat-view" class="view-panel-content hidden">
-          
-          <div class="page-header">
-            <div>
-              <h1 class="page-title">Global Team Chat</h1>
-              <p class="page-sub">Discuss problems with your team. Paste LeetCode links for problem cards.</p>
-            </div>
-            <div class="page-actions">
-              <div class="chat-identity-badge-box">
-                <span class="chat-sender-label">Posting as:</span>
-                <div class="active-user-pill">
-                  <img id="chat-active-avatar" src="https://assets.leetcode.com/users/default_avatar.jpg" class="active-user-avatar">
-                  <span id="chat-active-name">Profile</span>
-                </div>
-                <button id="btn-switch-identity" class="btn-secondary-outline btn-sm">
-                  <i data-lucide="user-cog"></i> Switch
-                </button>
-              </div>
-            </div>
-          </div>
 
-          <div class="chat-window-card">
-            <div id="chat-messages-body" class="chat-messages-container">
-              <!-- Chat messages injected via JS -->
-            </div>
-
-            <form id="chat-send-form" class="chat-input-row">
-              <input type="text" id="chat-input-text" placeholder="Type a message or paste a LeetCode URL..." autocomplete="off" required>
-              <button type="submit" class="btn-primary-green">
-                <i data-lucide="send"></i>
-              </button>
-            </form>
-          </div>
-
-        </div>
 
       </main>
 

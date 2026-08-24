@@ -381,11 +381,104 @@ body.sidebar-open {
   pointer-events: none;
 }
 
+/* Header Daily Question Option */
+.header-daily-question {
+  display: flex;
+  align-items: center;
+  margin: 0 auto;
+}
+
+.daily-question-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid rgba(249, 115, 22, 0.28);
+  border-radius: var(--radius-full);
+  padding: 5px 16px 5px 10px;
+  text-decoration: none;
+  color: var(--text-dark);
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.daily-question-badge:hover {
+  border-color: #f97316;
+  background: #fff7ed;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.15);
+}
+
+.daily-q-fire {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffedd5;
+  color: #f97316;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.daily-q-fire svg {
+  width: 16px;
+  height: 16px;
+}
+
+.daily-q-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.daily-q-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #ea580c;
+  letter-spacing: 0.4px;
+}
+
+.daily-q-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.daily-q-arrow {
+  width: 14px;
+  height: 14px;
+  color: var(--text-light);
+  margin-left: 2px;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.daily-question-badge:hover .daily-q-arrow {
+  color: #ea580c;
+  transform: translate(2px, -2px);
+}
+
+.daily-q-title.diff-easy { color: #10b981; }
+.daily-q-title.diff-medium { color: #f59e0b; }
+.daily-q-title.diff-hard { color: #ef4444; }
+
 .header-user-profile {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-shrink: 0;
+}
+
+.user-badge-link {
+  text-decoration: none;
+  color: inherit;
+  display: inline-block;
+  border-radius: var(--radius-full);
 }
 
 .user-badge-box {
@@ -396,6 +489,28 @@ body.sidebar-open {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-full);
   padding: 4px 14px 4px 6px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.user-badge-link:hover .user-badge-box {
+  border-color: var(--primary-green);
+  background: var(--primary-green-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.12);
+}
+
+.user-profile-ext-ic {
+  width: 13px;
+  height: 13px;
+  color: var(--text-light);
+  margin-left: 2px;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.user-badge-link:hover .user-profile-ext-ic {
+  color: var(--primary-green);
+  transform: translate(1px, -1px);
 }
 
 .user-avatar-small { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }

@@ -343,99 +343,52 @@ app.get('/api/user-fallback/:username', async (req, res) => {
   }
 });
 
-// ==========================================
-// Global Chat Backend Storage & APIs
-// ==========================================
-function getChatFilePath() {
-  const possibleDirs = [
-    process.env.DATA_DIR,
-    process.env.RENDER_DISK_PATH,
-    '/var/data',
-    __dirname
-  ].filter(Boolean);
-
-  for (const dir of possibleDirs) {
-    try {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+// Endpoint to fetch Today's LeetCode Daily Question
+app.get('/api/daily-question', async (req, res) => {
+  const dailyQuery = `
+    query questionOfToday {
+      activeDailyCodingChallengeQuestion {
+        date
+        userStatus
+        link
+        question {
+          questionFrontendId
+          title
+          titleSlug
+          difficulty
+        }
       }
-      const testFile = path.join(dir, `.write_test_${Date.now()}`);
-      fs.writeFileSync(testFile, 'test');
-      fs.unlinkSync(testFile);
-      return path.join(dir, 'chat_storage.json');
-    } catch (e) {
-      continue;
     }
-  }
-  return path.join(__dirname, 'chat_storage.json');
-}
+  `;
 
-const CHAT_FILE = getChatFilePath();
-console.log(`[Chat System] Initialized storage at: ${CHAT_FILE}`);
-
-let globalChatMessages = [];
-
-try {
-  if (fs.existsSync(CHAT_FILE)) {
-    const rawData = fs.readFileSync(CHAT_FILE, 'utf8');
-    globalChatMessages = JSON.parse(rawData);
-  } else {
-    const localBackup = path.join(__dirname, 'chat_storage.json');
-    if (fs.existsSync(localBackup)) {
-      const rawData = fs.readFileSync(localBackup, 'utf8');
-      globalChatMessages = JSON.parse(rawData);
-    }
-  }
-} catch (e) {
-  console.error('Failed to load chat history from disk:', e.message);
-  globalChatMessages = [];
-}
-
-function saveChatStorage() {
   try {
-    fs.writeFileSync(CHAT_FILE, JSON.stringify(globalChatMessages, null, 2), 'utf8');
-    const localBackup = path.join(__dirname, 'chat_storage.json');
-    if (CHAT_FILE !== localBackup) {
-      try {
-        fs.writeFileSync(localBackup, JSON.stringify(globalChatMessages, null, 2), 'utf8');
-      } catch (e) {}
+    const data = await fetchLeetCodeGraphQL(dailyQuery, {});
+    const daily = data?.activeDailyCodingChallengeQuestion;
+    if (!daily || !daily.question) {
+      return res.json({
+        title: 'LeetCode Daily Challenge',
+        url: 'https://leetcode.com/problemset/all/',
+        difficulty: 'Medium'
+      });
     }
-  } catch (e) {
-    console.error('Failed to save chat storage to disk:', e.message);
+
+    const q = daily.question;
+    const qNum = q.questionFrontendId ? `${q.questionFrontendId}. ` : '';
+    res.json({
+      date: daily.date,
+      title: `${qNum}${q.title}`,
+      titleSlug: q.titleSlug,
+      difficulty: q.difficulty || 'Medium',
+      url: `https://leetcode.com${daily.link || `/problems/${q.titleSlug}/`}`
+    });
+  } catch (err) {
+    console.error('Error fetching daily question:', err.message);
+    res.json({
+      title: 'LeetCode Daily Challenge',
+      url: 'https://leetcode.com/problemset/all/',
+      difficulty: 'Medium'
+    });
   }
-}
-
-// GET /api/chat - Fetch all global chat messages
-app.get('/api/chat', (req, res) => {
-  res.json({ messages: globalChatMessages });
-});
-
-// POST /api/chat - Save new message to global chat backend
-app.post('/api/chat', (req, res) => {
-  const { senderUsername, text } = req.body || {};
-  if (!senderUsername || !text || !text.trim()) {
-    return res.status(400).json({ error: 'senderUsername and text are required' });
-  }
-
-  const newMsg = {
-    id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-    senderUsername: senderUsername.trim(),
-    text: text.trim(),
-    timestamp: new Date().toISOString()
-  };
-
-  globalChatMessages.push(newMsg);
-  if (globalChatMessages.length > 1000) {
-    globalChatMessages = globalChatMessages.slice(-1000);
-  }
-
-  saveChatStorage();
-
-  res.status(201).json({
-    success: true,
-    message: newMsg,
-    messages: globalChatMessages
-  });
 });
 
 app.listen(PORT, () => {
