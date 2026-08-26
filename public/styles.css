@@ -1462,6 +1462,13 @@ body.sidebar-open {
 .problem-diff-pill.diff-medium { background: #fef3c7; color: #b45309; }
 .problem-diff-pill.diff-hard { background: #fee2e2; color: #b91c1c; }
 
+.daily-problem-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .daily-problem-time {
   font-size: 0.75rem;
   color: var(--text-light);

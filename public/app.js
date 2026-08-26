@@ -803,9 +803,11 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="daily-problem-left">
                 <i data-lucide="check-circle-2" style="width: 16px; height: 16px; color: var(--primary-green); flex-shrink: 0;"></i>
                 <a href="${problemUrl}" target="_blank" class="daily-problem-link">${sub.title}</a>
-                <span class="problem-diff-pill diff-${diffClass}">${diffLabel}</span>
               </div>
-              <span class="daily-problem-time">${timeStr}</span>
+              <div class="daily-problem-right">
+                <span class="problem-diff-pill diff-${diffClass}">${diffLabel}</span>
+                <span class="daily-problem-time">${timeStr}</span>
+              </div>
             </div>
           `;
         });
