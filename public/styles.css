@@ -238,48 +238,101 @@ body.sidebar-open {
   text-transform: uppercase;
 }
 
-.sidebar-members-list {
+.sidebar-groups-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
 }
 
-.sidebar-member-item {
+.sidebar-group-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
   color: var(--text-muted);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 600;
+  text-align: left;
 }
 
-.sidebar-member-item:hover, .sidebar-member-item.active {
+.sidebar-group-item:hover {
   background-color: var(--primary-green-light);
   color: var(--primary-green);
 }
 
-.member-item-left {
+.sidebar-group-item.active {
+  background-color: var(--primary-green-light);
+  color: var(--primary-green);
+  font-weight: 700;
+}
+
+.group-item-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  overflow: hidden;
 }
 
-.sidebar-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
+.group-item-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
 }
 
-.active-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--primary-green);
+.group-item-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-code-pill {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  background: var(--bg-shell);
+  border: 1px solid var(--border-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: copy;
+  transition: all 0.15s ease;
+}
+
+.group-code-pill:hover {
+  background: var(--bg-card);
+  color: var(--primary-green);
+  border-color: var(--primary-green);
+}
+
+.empty-group-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 32px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px 0;
+}
+
+.empty-group-box p {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  max-width: 420px;
+  line-height: 1.5;
 }
 
 .sidebar-menu-btn {
@@ -1789,4 +1842,27 @@ body.sidebar-open {
   .header-user-profile {
     justify-content: flex-end;
   }
+}
+
+/* App Modal Overlay - uses existing .modal-card styles */
+.modal-overlay.hidden {
+  display: none !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.96) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-overlay {
+  animation: fadeIn 0.18s ease;
+}
+
+.modal-overlay .modal-card {
+  animation: scaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }

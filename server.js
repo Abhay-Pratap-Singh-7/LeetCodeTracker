@@ -1,7 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const supabase = require('./supabase');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -428,6 +430,188 @@ app.get('/api/daily-question', async (req, res) => {
       acRate: '50.0%',
       topicTags: ['Algorithms']
     });
+  }
+});
+
+// Supabase & App Configuration endpoint
+app.get('/api/config', (req, res) => {
+  res.json({
+    supabaseUrl: process.env.SUPABASE_URL && !process.env.SUPABASE_URL.includes('your-project-id') ? process.env.SUPABASE_URL : null,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_ANON_KEY !== 'your-supabase-anon-key' ? process.env.SUPABASE_ANON_KEY : null,
+    hasSupabase: !!supabase
+  });
+});
+
+// Profile Sync Endpoint
+app.post('/api/profile/sync', async (req, res) => {
+  if (!supabase) {
+    return res.status(530).json({ error: 'Supabase is not configured.' });
+  }
+
+  const { id, email, name, avatar, leetcodeUsername } = req.body;
+  if (!id || !leetcodeUsername) {
+    return res.status(400).json({ error: 'User ID and LeetCode username are required.' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .upsert({
+        id,
+        email: email || '',
+        name: name || email || 'User',
+        avatar: avatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
+        leetcode_username: leetcodeUsername.trim(),
+        updated_at: new Date()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, profile: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Group API Endpoints
+app.post('/api/groups', async (req, res) => {
+  if (!supabase) {
+    return res.status(503).json({ error: 'Supabase is not configured yet. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env file.' });
+  }
+
+  const { name, createdBy, leetcodeUsername, email, fullName, avatarUrl } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Group name is required.' });
+  }
+
+  const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  try {
+    if (createdBy && leetcodeUsername) {
+      await supabase.from('profiles').upsert({
+        id: createdBy,
+        email: email || '',
+        name: fullName || email || 'User',
+        avatar: avatarUrl || 'https://assets.leetcode.com/users/default_avatar.jpg',
+        leetcode_username: leetcodeUsername.trim(),
+        updated_at: new Date()
+      });
+    }
+
+    const { data: group, error } = await supabase
+      .from('groups')
+      .insert([{ name: name.trim(), invite_code: inviteCode, created_by: createdBy || null }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (createdBy) {
+      await supabase.from('group_members').insert([{ group_id: group.id, user_id: createdBy, role: 'admin' }]);
+    }
+
+    res.json({ success: true, group });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/groups/join', async (req, res) => {
+  if (!supabase) {
+    return res.status(503).json({ error: 'Supabase is not configured yet.' });
+  }
+
+  const { inviteCode, userId, leetcodeUsername, email, fullName, avatarUrl } = req.body;
+  if (!inviteCode || !userId) {
+    return res.status(400).json({ error: 'Invite code and user ID are required.' });
+  }
+
+  try {
+    if (leetcodeUsername) {
+      await supabase.from('profiles').upsert({
+        id: userId,
+        email: email || '',
+        name: fullName || email || 'User',
+        avatar: avatarUrl || 'https://assets.leetcode.com/users/default_avatar.jpg',
+        leetcode_username: leetcodeUsername.trim(),
+        updated_at: new Date()
+      });
+    }
+
+    const { data: group, error: groupErr } = await supabase
+      .from('groups')
+      .select('id, name, invite_code')
+      .eq('invite_code', inviteCode.trim().toUpperCase())
+      .single();
+
+    if (groupErr || !group) {
+      return res.status(404).json({ error: 'Invalid invite code.' });
+    }
+
+    const { error: joinErr } = await supabase
+      .from('group_members')
+      .insert([{ group_id: group.id, user_id: userId, role: 'member' }]);
+
+    if (joinErr && !joinErr.message.includes('duplicate')) {
+      throw joinErr;
+    }
+
+    res.json({ success: true, group });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/groups/user/:userId', async (req, res) => {
+  if (!supabase) {
+    return res.status(503).json({ error: 'Supabase is not configured yet.' });
+  }
+
+  try {
+    const { data: userGroups, error } = await supabase
+      .from('group_members')
+      .select('group_id, role, groups(id, name, invite_code)')
+      .eq('user_id', req.params.userId);
+
+    if (error) throw error;
+    res.json({ groups: (userGroups || []).map(g => g.groups) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/groups/:groupId', async (req, res) => {
+  if (!supabase) {
+    return res.status(503).json({ error: 'Supabase is not configured yet.' });
+  }
+
+  try {
+    const { data: group, error: groupErr } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('id', req.params.groupId)
+      .single();
+
+    if (groupErr) throw groupErr;
+
+    const { data: members, error: memErr } = await supabase
+      .from('group_members')
+      .select('user_id, role, profiles(id, email, name, avatar, leetcode_username)')
+      .eq('group_id', req.params.groupId);
+
+    if (memErr) throw memErr;
+
+    const formattedMembers = (members || []).map(m => ({
+      username: m.profiles?.leetcode_username || m.profiles?.email?.split('@')[0] || 'unknown',
+      name: m.profiles?.name || m.profiles?.leetcode_username || 'Member',
+      avatar: m.profiles?.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
+      role: m.role
+    }));
+
+    res.json({ group, members: formattedMembers });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -12,6 +12,8 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Favicon & App Icon -->
   <link rel="icon" type="image/webp" href="assets/logo.webp">
   <link rel="apple-touch-icon" href="assets/logo.webp">
@@ -61,11 +63,56 @@
           </button>
         </div>
 
-        <!-- Saved Members Section (Shifted Below View Modes) -->
+        <!-- Your Groups Section -->
         <div class="menu-group">
-          <span class="menu-heading">SAVED MEMBERS</span>
-          <div id="sidebar-members-list" class="sidebar-members-list">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span class="menu-heading">YOUR GROUPS</span>
+            <span id="sidebar-groups-count" class="badge-sub" style="font-size: 0.65rem; padding: 2px 6px;">0</span>
+          </div>
+          <div id="sidebar-groups-list" class="sidebar-groups-list">
             <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- Supabase Auth & Group Actions Section -->
+        <div class="menu-group" id="supabase-auth-group">
+          <span class="menu-heading">ACCOUNT & ACTIONS</span>
+          
+          <div id="auth-unauthenticated-state">
+            <button id="btn-login-google" class="sidebar-menu-btn" style="background: rgba(66, 133, 244, 0.1); color: #4285f4; border: 1px solid rgba(66, 133, 244, 0.2);">
+              <i data-lucide="log-in"></i>
+              <span>Sign in with Google</span>
+            </button>
+          </div>
+
+          <div id="auth-authenticated-state" class="hidden">
+            <div id="user-profile-badge" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 8px; background: var(--bg-shell); border-radius: var(--radius-md);">
+              <img id="auth-user-avatar" src="https://assets.leetcode.com/users/default_avatar.jpg" style="width: 24px; height: 24px; border-radius: 50%;">
+              <span id="auth-user-name" style="font-size: 0.82rem; font-weight: 700; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">User</span>
+              <button id="btn-logout" title="Sign out" style="background: transparent; border: none; color: var(--text-light); cursor: pointer; margin-left: auto;">
+                <i data-lucide="log-out" style="width: 14px; height: 14px;"></i>
+              </button>
+            </div>
+
+            <button id="btn-create-group" class="sidebar-menu-btn" style="margin-bottom: 4px;">
+              <i data-lucide="users-round"></i>
+              <span>Create Group</span>
+            </button>
+
+            <button id="btn-join-group" class="sidebar-menu-btn" style="margin-bottom: 4px;">
+              <i data-lucide="user-plus"></i>
+              <span>Join Group</span>
+            </button>
+
+            <button id="btn-update-username" class="sidebar-menu-btn" style="margin-bottom: 4px;">
+              <i data-lucide="user-pen"></i>
+              <span>Update LeetCode ID</span>
+            </button>
+
+            <button id="btn-logout-menu" class="sidebar-menu-btn" style="color: #dc2626;">
+              <i data-lucide="log-out" style="color: #dc2626;"></i>
+              <span>Sign Out</span>
+            </button>
           </div>
         </div>
 
@@ -181,8 +228,14 @@
           
           <div class="page-header">
             <div>
-              <h1 class="page-title">Daily Track</h1>
-              <p class="page-sub">Real-time daily problem solving log across all team members.</p>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <h1 class="page-title">Daily Track</h1>
+                <span id="daily-active-group-badge" class="badge-sub green" style="display:none; align-items: center; gap: 4px;">
+                  <i data-lucide="users" style="width: 12px; height: 12px;"></i>
+                  <span id="daily-active-group-name">Group</span>
+                </span>
+              </div>
+              <p id="daily-track-subtitle" class="page-sub">Real-time daily problem solving log across all group members.</p>
             </div>
             <div class="page-actions">
               <div class="date-select-wrapper">
@@ -396,8 +449,14 @@
           
           <div class="page-header">
             <div>
-              <h1 class="page-title">Team Leaderboard</h1>
-              <p class="page-sub">Comprehensive statistics comparison across all saved team members.</p>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <h1 class="page-title">Team Leaderboard</h1>
+                <span id="team-active-group-badge" class="badge-sub green" style="display:none; align-items: center; gap: 4px;">
+                  <i data-lucide="users" style="width: 12px; height: 12px;"></i>
+                  <span id="team-active-group-name">Group</span>
+                </span>
+              </div>
+              <p id="team-leaderboard-subtitle" class="page-sub">Comprehensive statistics comparison across all group members.</p>
             </div>
             <div class="page-actions">
               <button id="btn-refresh-team" class="btn-primary-green">
@@ -482,8 +541,14 @@
           
           <div class="page-header">
             <div>
-              <h1 class="page-title">Team Warnings</h1>
-              <p class="page-sub">Tracking member compliance (at least 1 problem/day required since Aug 21, 2026).</p>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <h1 class="page-title">Team Warnings</h1>
+                <span id="warnings-active-group-badge" class="badge-sub green" style="display:none; align-items: center; gap: 4px;">
+                  <i data-lucide="users" style="width: 12px; height: 12px;"></i>
+                  <span id="warnings-active-group-name">Group</span>
+                </span>
+              </div>
+              <p id="warnings-subtitle" class="page-sub">Tracking member compliance (at least 1 problem/day required since Aug 21, 2026).</p>
             </div>
             <div class="page-actions">
               <button id="btn-refresh-warnings" class="btn-primary-green">
@@ -504,6 +569,28 @@
 
     </div>
 
+  </div>
+
+  <!-- Universal Custom Modal UI Overlay -->
+  <div id="app-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card" style="position:relative;">
+      <button id="modal-close-btn" style="position:absolute;top:14px;right:14px;background:transparent;border:none;cursor:pointer;color:var(--text-light);display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;transition:background 0.15s,color 0.15s;" onmouseenter="this.style.background='var(--bg-shell)';this.style.color='var(--text-dark)'" onmouseleave="this.style.background='transparent';this.style.color='var(--text-light)'">
+        <i data-lucide="x" style="width:16px;height:16px;"></i>
+      </button>
+      <div class="modal-icon" id="modal-icon-wrap">
+        <i data-lucide="link" id="modal-icon" style="width:28px;height:28px;"></i>
+      </div>
+      <h2 id="modal-title">Link LeetCode Account</h2>
+      <p id="modal-description" style="display:none;"></p>
+      <div id="modal-input-container" class="modal-select-wrapper">
+        <input type="text" id="modal-input" class="modal-dropdown" placeholder="Enter LeetCode username or profile link..." autocomplete="off" style="border-radius: var(--radius-md); text-align: left; font-weight: 500;">
+      </div>
+      <button id="modal-submit-btn" class="btn-primary-green full-width-btn">
+        <span id="modal-submit-text">Save</span>
+        <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
+      </button>
+      <button id="modal-cancel-btn" class="btn-secondary-outline full-width-btn" style="display:none;">Cancel</button>
+    </div>
   </div>
 
   <script src="app.js"></script>

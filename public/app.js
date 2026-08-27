@@ -7,53 +7,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.lucide.createIcons();
   }
 
-  const DEFAULT_TEAM = [
-    { username: 'aditya7417', name: 'Aditya', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: 'vuvcVjbwmU', name: 'Harshit', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: 'Aryanj_17', name: 'Aryan', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: 'kartik23-2', name: 'Kartik', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: '_palakdeep', name: 'Palakdeep', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: '18WAgXvMr1', name: 'Abhay', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: 'I2pULBxMMM', name: 'Akhilesh', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: 'janhavi0411', name: 'Janhavi', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' },
-    { username: 'VanshPal46', name: 'Vansh', avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' }
-  ];
-
-  let savedMembers = DEFAULT_TEAM;
-  let savedStorage = localStorage.getItem('leetdash_saved_members_v2');
-
-  if (savedStorage) {
-    try {
-      const parsed = JSON.parse(savedStorage);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const valid = parsed
-          .map(item => {
-            if (typeof item === 'string') return { username: item, name: item, avatar: 'https://assets.leetcode.com/users/default_avatar.jpg' };
-            if (item && typeof item === 'object' && item.username) return item;
-            return null;
-          })
-          .filter(Boolean);
-
-        if (valid.length > 0) {
-          savedMembers = valid;
-        }
-      }
-    } catch (e) {
-      savedMembers = DEFAULT_TEAM;
-    }
-  }
-
-  DEFAULT_TEAM.forEach(m => {
-    if (!savedMembers.some(sm => sm.username.toLowerCase() === m.username.toLowerCase())) {
-      savedMembers.push(m);
-    }
-  });
-
-  localStorage.setItem('leetdash_saved_members_v2', JSON.stringify(savedMembers));
-
   const state = {
     currentUser: null,
-    savedMembers: savedMembers,
+    authUser: null,
+    userGroups: [],
+    activeGroup: null,
+    groupMembers: [],
     teamData: {},
     activeView: 'daily',
     charts: {
@@ -99,17 +58,388 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(tooltipEl);
   }
 
+  let supabaseClient = null;
+
   init();
 
-  function init() {
-    renderSidebarMembers();
+  async function init() {
+    renderSidebarGroups();
     setupEventListeners();
+    await initSupabase();
 
     switchView('daily');
 
-    const firstValidMember = state.savedMembers.find(m => m && m.username);
-    const defaultUser = firstValidMember ? firstValidMember.username : '18WAgXvMr1';
+    // If user entered search or default
+    const defaultUser = '18WAgXvMr1';
     loadUserDataSilent(defaultUser);
+  }
+
+  async function initSupabase() {
+    try {
+      const res = await fetch('/api/config');
+      const config = await res.json();
+
+      if (config.supabaseUrl && config.supabaseAnonKey && window.supabase) {
+        supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        await updateAuthUI(session?.user || null);
+
+        supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+          await updateAuthUI(session?.user || null);
+        });
+      }
+    } catch (e) {
+      console.log('Supabase frontend init skipped:', e.message);
+    }
+  }
+
+  function showCustomModal({ title = 'Link LeetCode Account', icon = 'link', description = '', placeholder = '', value = '', submitText = 'Save', cancelText = '', hideInput = false }) {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById('app-modal-overlay');
+      const titleEl = document.getElementById('modal-title');
+      const iconEl = document.getElementById('modal-icon');
+      const descEl = document.getElementById('modal-description');
+      const inputEl = document.getElementById('modal-input');
+      const inputContainer = document.getElementById('modal-input-container');
+      const submitTextEl = document.getElementById('modal-submit-text');
+      const submitBtn = document.getElementById('modal-submit-btn');
+      const cancelBtn = document.getElementById('modal-cancel-btn');
+      const closeBtn = document.getElementById('modal-close-btn');
+
+      if (!overlay) {
+        if (hideInput) { alert(`${title}\n\n${description}`); return resolve(true); }
+        return resolve(prompt(`${title}\n${description}`, value));
+      }
+
+      if (titleEl) titleEl.textContent = title;
+      if (iconEl) { iconEl.setAttribute('data-lucide', icon); }
+      if (descEl) {
+        descEl.textContent = description || '';
+        descEl.style.display = description ? 'block' : 'none';
+      }
+      if (submitTextEl) submitTextEl.textContent = submitText;
+      if (cancelBtn) {
+        cancelBtn.textContent = cancelText || 'Cancel';
+        cancelBtn.style.display = cancelText ? 'flex' : 'none';
+      }
+      if (inputEl) { inputEl.value = value; inputEl.placeholder = placeholder || 'Enter value...'; }
+      if (inputContainer) inputContainer.style.display = hideInput ? 'none' : 'block';
+
+      overlay.classList.remove('hidden');
+      if (window.lucide) window.lucide.createIcons();
+      if (!hideInput && inputEl) setTimeout(() => inputEl.focus(), 50);
+
+      function cleanup(result) {
+        overlay.classList.add('hidden');
+        if (submitBtn) submitBtn.removeEventListener('click', onConfirm);
+        if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+        if (closeBtn) closeBtn.removeEventListener('click', onCancel);
+        if (inputEl) inputEl.removeEventListener('keydown', onKeyDown);
+        resolve(result);
+      }
+      function onConfirm() {
+        const val = hideInput ? true : inputEl.value.trim();
+        if (!hideInput && !val) return;
+        cleanup(val);
+      }
+      function onCancel() { cleanup(null); }
+      function onKeyDown(e) { if (e.key === 'Enter') { e.preventDefault(); onConfirm(); } }
+
+      if (submitBtn) submitBtn.addEventListener('click', onConfirm);
+      if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
+      if (closeBtn) closeBtn.addEventListener('click', onCancel);
+      if (inputEl) inputEl.addEventListener('keydown', onKeyDown);
+    });
+  }
+
+  function extractLeetCodeUsername(input) {
+    if (!input) return null;
+    const trimmed = input.trim();
+    const match = trimmed.match(/(?:leetcode\.com\/(?:u\/)?|@)?([a-zA-Z0-9_-]+)/);
+    return match && match[1] ? match[1] : trimmed;
+  }
+
+  async function updateAuthUI(user) {
+    state.authUser = user;
+    const unauthEl = document.getElementById('auth-unauthenticated-state');
+    const authEl = document.getElementById('auth-authenticated-state');
+    const userNameEl = document.getElementById('auth-user-name');
+    const userAvatarEl = document.getElementById('auth-user-avatar');
+
+    if (user) {
+      if (unauthEl) unauthEl.classList.add('hidden');
+      if (authEl) authEl.classList.remove('hidden');
+
+      const fullName = user.user_metadata?.full_name || user.email || 'Authenticated User';
+      const avatarUrl = user.user_metadata?.avatar_url || 'https://assets.leetcode.com/users/default_avatar.jpg';
+
+      let lcUsername = user.user_metadata?.leetcode_username || localStorage.getItem(`lc_user_${user.id}`);
+      if (!lcUsername) {
+        const input = await showCustomModal({
+          title: 'Link LeetCode Account',
+          description: '',
+          placeholder: 'Enter LeetCode username or profile link...',
+          submitText: 'Save',
+          cancelText: ''
+        });
+
+        if (input) {
+          lcUsername = extractLeetCodeUsername(input);
+          if (lcUsername) {
+            localStorage.setItem(`lc_user_${user.id}`, lcUsername);
+            if (supabaseClient) {
+              try {
+                await supabaseClient.auth.updateUser({ data: { leetcode_username: lcUsername } });
+              } catch (e) {}
+            }
+          }
+        }
+      }
+
+      const handle = lcUsername ? `@${lcUsername}` : (user.email ? `@${user.email.split('@')[0]}` : '@google_user');
+
+      if (userNameEl) userNameEl.textContent = fullName;
+      if (userAvatarEl) userAvatarEl.src = avatarUrl;
+
+      // Sync Profile to Server Database
+      if (lcUsername && user.id) {
+        try {
+          await fetch('/api/profile/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: user.id,
+              email: user.email,
+              name: fullName,
+              avatar: avatarUrl,
+              leetcodeUsername: lcUsername
+            })
+          });
+        } catch (e) {}
+      }
+
+      // Update Top Right Header Profile
+      const headerAvatar = document.getElementById('header-user-avatar');
+      const headerName = document.getElementById('header-user-name');
+      const headerHandle = document.getElementById('header-user-handle');
+      const headerLink = document.getElementById('header-user-link');
+
+      if (headerAvatar) headerAvatar.src = avatarUrl;
+      if (headerName) headerName.textContent = fullName;
+      if (headerHandle) headerHandle.textContent = handle;
+      if (headerLink) {
+        headerLink.onclick = null;
+        if (lcUsername) {
+          headerLink.href = `https://leetcode.com/u/${lcUsername}/`;
+          headerLink.target = '_blank';
+          headerLink.title = `Open LeetCode Profile (@${lcUsername})`;
+        } else {
+          headerLink.href = 'javascript:void(0)';
+          headerLink.title = 'Click to link your LeetCode Profile';
+          headerLink.onclick = async (e) => {
+            e.preventDefault();
+            const input = await showCustomModal({
+              title: 'Link LeetCode Profile',
+              description: 'Enter your LeetCode username or profile link:',
+              placeholder: 'Username or Profile URL...'
+            });
+            if (input) {
+              const u = extractLeetCodeUsername(input);
+              if (u) {
+                localStorage.setItem(`lc_user_${user.id}`, u);
+                if (supabaseClient) {
+                  try {
+                    await supabaseClient.auth.updateUser({ data: { leetcode_username: u } });
+                  } catch (err) {}
+                }
+                window.open(`https://leetcode.com/u/${u}/`, '_blank');
+                updateAuthUI(user);
+              }
+            }
+          };
+        }
+      }
+
+      // Load user groups from database
+      await loadUserGroups(user.id);
+
+    } else {
+      if (unauthEl) unauthEl.classList.remove('hidden');
+      if (authEl) authEl.classList.add('hidden');
+
+      state.userGroups = [];
+      state.activeGroup = null;
+      state.groupMembers = [];
+      renderSidebarGroups();
+      updateActiveGroupBadges();
+
+      if (state.currentUser) {
+        renderHeaderUserProfile(state.currentUser);
+      }
+
+      if (state.activeView === 'daily') loadDailyTrackData();
+      else if (state.activeView === 'team') loadTeamData();
+      else if (state.activeView === 'warnings') loadWarningsData();
+    }
+  }
+
+  function renderSidebarGroups() {
+    const list = document.getElementById('sidebar-groups-list');
+    const countBadge = document.getElementById('sidebar-groups-count');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (countBadge) {
+      countBadge.textContent = state.userGroups.length;
+    }
+
+    if (!state.authUser) {
+      list.innerHTML = `<div style="font-size: 0.78rem; color: var(--text-light); padding: 8px 4px; text-align: center;">Sign in to view & join groups</div>`;
+      return;
+    }
+
+    if (state.userGroups.length === 0) {
+      list.innerHTML = `<div style="font-size: 0.78rem; color: var(--text-light); padding: 8px 4px; text-align: center;">No groups joined yet.<br>Create or join one below!</div>`;
+      return;
+    }
+
+    state.userGroups.forEach(group => {
+      if (!group || !group.id) return;
+      const item = document.createElement('div');
+      const isActive = state.activeGroup && state.activeGroup.id === group.id;
+      item.className = `sidebar-group-item ${isActive ? 'active' : ''}`;
+
+      item.innerHTML = `
+        <div class="group-item-left">
+          <i data-lucide="users" style="width: 16px; height: 16px; flex-shrink: 0; color: ${isActive ? 'var(--primary-green)' : 'var(--text-light)'}"></i>
+          <span class="group-item-name" title="${group.name}">${group.name}</span>
+        </div>
+        <div class="group-item-right">
+          ${group.invite_code ? `<span class="group-code-pill" title="Click to copy invite code: ${group.invite_code}">${group.invite_code}</span>` : ''}
+          ${isActive ? '<span class="active-dot"></span>' : ''}
+        </div>
+      `;
+
+      const codePill = item.querySelector('.group-code-pill');
+      if (codePill) {
+        codePill.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(group.invite_code);
+          codePill.textContent = 'COPIED!';
+          setTimeout(() => { codePill.textContent = group.invite_code; }, 1500);
+        });
+      }
+
+      item.addEventListener('click', () => {
+        selectGroup(group.id);
+        closeMobileSidebar();
+      });
+
+      list.appendChild(item);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  function updateActiveGroupBadges() {
+    const group = state.activeGroup;
+    const dailyBadge = document.getElementById('daily-active-group-badge');
+    const dailyName = document.getElementById('daily-active-group-name');
+    const dailySub = document.getElementById('daily-track-subtitle');
+
+    const teamBadge = document.getElementById('team-active-group-badge');
+    const teamName = document.getElementById('team-active-group-name');
+    const teamSub = document.getElementById('team-leaderboard-subtitle');
+
+    const warnBadge = document.getElementById('warnings-active-group-badge');
+    const warnName = document.getElementById('warnings-active-group-name');
+    const warnSub = document.getElementById('warnings-subtitle');
+
+    if (group) {
+      const gName = group.name;
+      if (dailyBadge) dailyBadge.style.display = 'inline-flex';
+      if (dailyName) dailyName.textContent = gName;
+      if (dailySub) dailySub.textContent = `Real-time daily problem solving log for group "${gName}" (${state.groupMembers.length} members).`;
+
+      if (teamBadge) teamBadge.style.display = 'inline-flex';
+      if (teamName) teamName.textContent = gName;
+      if (teamSub) teamSub.textContent = `Leaderboard & statistics for group "${gName}".`;
+
+      if (warnBadge) warnBadge.style.display = 'inline-flex';
+      if (warnName) warnName.textContent = gName;
+      if (warnSub) warnSub.textContent = `Tracking member compliance for group "${gName}".`;
+    } else {
+      if (dailyBadge) dailyBadge.style.display = 'none';
+      if (dailySub) dailySub.textContent = 'Real-time daily problem solving log across group members.';
+
+      if (teamBadge) teamBadge.style.display = 'none';
+      if (teamSub) teamSub.textContent = 'Comprehensive statistics comparison across group members.';
+
+      if (warnBadge) warnBadge.style.display = 'none';
+      if (warnSub) warnSub.textContent = 'Tracking member compliance (at least 1 problem/day required).';
+    }
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  async function loadUserGroups(userId) {
+    if (!userId) return;
+    try {
+      const res = await fetch(`/api/groups/user/${userId}`);
+      const data = await res.json();
+      state.userGroups = (data.groups || []).filter(Boolean);
+      renderSidebarGroups();
+
+      if (state.userGroups.length > 0) {
+        const savedGroupId = localStorage.getItem('active_group_id');
+        const defaultGroup = state.userGroups.find(g => g.id === savedGroupId) || state.userGroups[0];
+        await selectGroup(defaultGroup.id);
+      } else {
+        state.activeGroup = null;
+        state.groupMembers = [];
+        updateActiveGroupBadges();
+        if (state.activeView === 'daily') loadDailyTrackData();
+        else if (state.activeView === 'team') loadTeamData();
+        else if (state.activeView === 'warnings') loadWarningsData();
+      }
+    } catch (e) {
+      console.error('Error fetching user groups:', e);
+    }
+  }
+
+  async function selectGroup(groupId) {
+    if (!groupId) return;
+    const group = state.userGroups.find(g => g.id === groupId) || state.activeGroup;
+    if (group) {
+      state.activeGroup = group;
+      localStorage.setItem('active_group_id', groupId);
+      renderSidebarGroups();
+      await loadGroupMembers(groupId);
+    }
+  }
+
+  async function loadGroupMembers(groupId) {
+    if (!groupId) return;
+    try {
+      const res = await fetch(`/api/groups/${groupId}`);
+      const data = await res.json();
+      if (data && data.group) {
+        state.activeGroup = data.group;
+        state.groupMembers = (data.members || []).map(m => ({
+          username: m.username,
+          name: m.name || m.username,
+          avatar: m.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg',
+          role: m.role
+        }));
+        updateActiveGroupBadges();
+        renderSidebarGroups();
+        if (state.activeView === 'team') loadTeamData();
+        else if (state.activeView === 'daily') loadDailyTrackData();
+        else if (state.activeView === 'warnings') loadWarningsData();
+      }
+    } catch (e) {
+      console.error('Error loading group members:', e);
+    }
   }
 
   function openMobileSidebar() {
@@ -158,23 +488,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    if (btnAddMember) {
-      btnAddMember.addEventListener('click', () => {
-        if (!state.currentUser) return;
-        const user = state.currentUser;
-        const exists = state.savedMembers.some(m => m.username.toLowerCase() === user.username.toLowerCase());
-        if (!exists) {
-          state.savedMembers.push({
-            username: user.username,
-            name: user.name || user.username,
-            avatar: user.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg'
-          });
-          saveMembersToStorage();
-          renderSidebarMembers();
-        }
-      });
-    }
-
     menuViewProfile.addEventListener('click', () => { switchView('single'); closeMobileSidebar(); });
     menuViewTeam.addEventListener('click', () => { switchView('team'); closeMobileSidebar(); });
     if (menuViewDaily) menuViewDaily.addEventListener('click', () => { switchView('daily'); closeMobileSidebar(); });
@@ -191,6 +504,246 @@ document.addEventListener('DOMContentLoaded', () => {
       switchView('single');
       loadUserData(username);
     });
+
+    const btnLoginGoogle = document.getElementById('btn-login-google');
+    if (btnLoginGoogle) {
+      btnLoginGoogle.addEventListener('click', async () => {
+        if (!supabaseClient) {
+          alert('Supabase credentials are not configured in your .env file yet. Please set SUPABASE_URL and SUPABASE_ANON_KEY to enable Google Authentication.');
+          return;
+        }
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.origin }
+        });
+        if (error) alert('Login failed: ' + error.message);
+      });
+    }
+
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+      btnLogout.addEventListener('click', async () => {
+        if (supabaseClient) {
+          await supabaseClient.auth.signOut();
+          updateAuthUI(null);
+        }
+      });
+    }
+
+    const btnLogoutMenu = document.getElementById('btn-logout-menu');
+    if (btnLogoutMenu) {
+      btnLogoutMenu.addEventListener('click', async () => {
+        if (supabaseClient) {
+          await supabaseClient.auth.signOut();
+          updateAuthUI(null);
+        }
+      });
+    }
+
+    const btnUpdateUsername = document.getElementById('btn-update-username');
+    if (btnUpdateUsername) {
+      btnUpdateUsername.addEventListener('click', async () => {
+        const user = state.authUser;
+        if (!user) return;
+        const currentLc = user.user_metadata?.leetcode_username || localStorage.getItem(`lc_user_${user.id}`) || '';
+        const input = await showCustomModal({
+          title: 'Update LeetCode ID',
+          icon: 'user-pen',
+          description: 'Enter your new LeetCode username or profile link:',
+          placeholder: 'Username or Profile URL...',
+          value: currentLc,
+          submitText: 'Update'
+        });
+
+        if (input) {
+          const newUsername = extractLeetCodeUsername(input);
+          if (newUsername) {
+            localStorage.setItem(`lc_user_${user.id}`, newUsername);
+            if (supabaseClient) {
+              try {
+                await supabaseClient.auth.updateUser({ data: { leetcode_username: newUsername } });
+              } catch (e) {}
+            }
+            try {
+              await fetch('/api/profile/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: user.id,
+                  email: user.email,
+                  name: user.user_metadata?.full_name || user.email,
+                  avatar: user.user_metadata?.avatar_url || 'https://assets.leetcode.com/users/default_avatar.jpg',
+                  leetcodeUsername: newUsername
+                })
+              });
+            } catch (e) {}
+
+            await showCustomModal({
+              title: 'Username Updated',
+              icon: 'check-circle',
+              description: `LeetCode ID successfully updated to @${newUsername}`,
+              submitText: 'Done',
+              cancelText: '',
+              hideInput: true
+            });
+
+            await updateAuthUI(user);
+            if (state.activeGroup) {
+              await loadGroupMembers(state.activeGroup.id);
+            }
+          }
+        }
+      });
+    }
+
+    const btnCreateGroup = document.getElementById('btn-create-group');
+    if (btnCreateGroup) {
+      btnCreateGroup.addEventListener('click', async () => {
+        const user = state.authUser;
+        let lcUsername = user?.user_metadata?.leetcode_username || (user ? localStorage.getItem(`lc_user_${user.id}`) : null);
+        if (!lcUsername) {
+          const input = await showCustomModal({
+            title: 'LeetCode Username Required',
+            icon: 'user',
+            description: 'Please enter your LeetCode username or profile link before creating a group:',
+            placeholder: 'Username or Profile URL...'
+          });
+          if (input) lcUsername = extractLeetCodeUsername(input);
+          if (!lcUsername) return;
+        }
+
+        const groupName = await showCustomModal({
+          title: 'Create New Group',
+          icon: 'users',
+          description: 'Enter a name for your group:',
+          placeholder: 'Group Name (e.g. Algo Knights)...',
+          submitText: 'Create Group'
+        });
+        if (!groupName) return;
+
+        try {
+          const res = await fetch('/api/groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: groupName,
+              createdBy: user?.id,
+              leetcodeUsername: lcUsername,
+              email: user?.email,
+              fullName: user?.user_metadata?.full_name || user?.email,
+              avatarUrl: user?.user_metadata?.avatar_url
+            })
+          });
+          const result = await res.json();
+          if (result.success) {
+            await showCustomModal({
+              title: 'Group Created!',
+              description: `Group "${result.group.name}" created successfully!\n\nInvite Code: ${result.group.invite_code}`,
+              submitText: 'Done',
+              cancelText: '',
+              hideInput: true
+            });
+            if (user?.id) await loadUserGroups(user.id);
+            await selectGroup(result.group.id);
+          } else {
+            await showCustomModal({
+              title: 'Error Creating Group',
+              description: result.error || 'Failed to create group.',
+              submitText: 'OK',
+              cancelText: '',
+              hideInput: true
+            });
+          }
+        } catch (e) {
+          await showCustomModal({
+            title: 'Error',
+            description: e.message,
+            submitText: 'OK',
+            cancelText: '',
+            hideInput: true
+          });
+        }
+      });
+    }
+
+    const btnJoinGroup = document.getElementById('btn-join-group');
+    if (btnJoinGroup) {
+      btnJoinGroup.addEventListener('click', async () => {
+        const user = state.authUser;
+        if (!user) {
+          await showCustomModal({
+            title: 'Sign In Required',
+            description: 'Please sign in first with Google to join a group.',
+            submitText: 'OK',
+            cancelText: '',
+            hideInput: true
+          });
+          return;
+        }
+
+        let lcUsername = user?.user_metadata?.leetcode_username || localStorage.getItem(`lc_user_${user.id}`);
+        if (!lcUsername) {
+          const input = await showCustomModal({
+            title: 'LeetCode Username Required',
+            description: 'Please enter your LeetCode username or profile link before joining a group:',
+            placeholder: 'Username or Profile URL...'
+          });
+          if (input) lcUsername = extractLeetCodeUsername(input);
+          if (!lcUsername) return;
+        }
+
+        const inviteCode = await showCustomModal({
+          title: 'Join Existing Group',
+          description: 'Enter 6-character group invite code:',
+          placeholder: 'Invite Code (e.g. X8K2P9)...',
+          submitText: 'Join Group'
+        });
+        if (!inviteCode) return;
+
+        try {
+          const res = await fetch('/api/groups/join', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inviteCode: inviteCode.trim(),
+              userId: user.id,
+              leetcodeUsername: lcUsername,
+              email: user.email,
+              fullName: user.user_metadata?.full_name || user.email,
+              avatarUrl: user.user_metadata?.avatar_url
+            })
+          });
+          const result = await res.json();
+          if (result.success) {
+            await showCustomModal({
+              title: 'Joined Group!',
+              description: `Joined group "${result.group.name}" successfully!`,
+              submitText: 'Done',
+              cancelText: '',
+              hideInput: true
+            });
+            if (user?.id) await loadUserGroups(user.id);
+            await selectGroup(result.group.id);
+          } else {
+            await showCustomModal({
+              title: 'Error Joining Group',
+              description: result.error || 'Failed to join group.',
+              submitText: 'OK',
+              cancelText: '',
+              hideInput: true
+            });
+          }
+        } catch (e) {
+          await showCustomModal({
+            title: 'Error',
+            description: e.message,
+            submitText: 'OK',
+            cancelText: '',
+            hideInput: true
+          });
+        }
+      });
+    }
   }
 
   function showShimmerLoading() {
@@ -230,8 +783,9 @@ document.addEventListener('DOMContentLoaded', () => {
       menuViewProfile.classList.add('active');
       dashboardView.classList.remove('hidden');
       if (!state.currentUser) {
-        const firstValidMember = state.savedMembers.find(m => m && m.username);
-        if (firstValidMember) loadUserData(firstValidMember.username);
+        const firstValidMember = state.groupMembers.find(m => m && m.username);
+        const u = firstValidMember ? firstValidMember.username : '18WAgXvMr1';
+        loadUserData(u);
       }
     } else if (view === 'team') {
       menuViewTeam.classList.add('active');
@@ -249,43 +803,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) window.lucide.createIcons();
   }
 
-  function saveMembersToStorage() {
-    localStorage.setItem('leetdash_saved_members_v2', JSON.stringify(state.savedMembers));
-  }
-
-  function renderSidebarMembers() {
-    const list = document.getElementById('sidebar-members-list');
-    if (!list) return;
-    list.innerHTML = '';
-
-    state.savedMembers.forEach(member => {
-      if (!member || !member.username) return;
-      const item = document.createElement('div');
-      const isActive = state.currentUser && state.currentUser.username.toLowerCase() === member.username.toLowerCase();
-      item.className = `sidebar-member-item ${isActive ? 'active' : ''}`;
-
-      const displayName = member.name || member.username;
-      const avatarUrl = member.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg';
-
-      item.innerHTML = `
-        <div class="member-item-left">
-          <img src="${avatarUrl}" alt="${displayName}" class="sidebar-avatar" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
-          <span title="@${member.username}">${displayName}</span>
-        </div>
-        ${isActive ? '<span class="active-dot"></span>' : ''}
-      `;
-
-      item.addEventListener('click', () => {
-        usernameInput.value = member.username;
-        switchView('single');
-        loadUserData(member.username);
-        closeMobileSidebar();
-      });
-
-      list.appendChild(item);
-    });
-  }
-
   async function loadUserDataSilent(username) {
     if (!username) return;
     try {
@@ -296,7 +813,6 @@ document.addEventListener('DOMContentLoaded', () => {
           state.currentUser = data;
           state.teamData[username] = data;
           renderDashboard(data);
-          renderSidebarMembers();
         }
       }
     } catch (e) {}
@@ -320,15 +836,13 @@ document.addEventListener('DOMContentLoaded', () => {
       state.currentUser = data;
       state.teamData[username] = data;
 
-      const memberIdx = state.savedMembers.findIndex(m => m && m.username.toLowerCase() === username.toLowerCase());
+      const memberIdx = state.groupMembers.findIndex(m => m && m.username.toLowerCase() === username.toLowerCase());
       if (memberIdx !== -1) {
-        state.savedMembers[memberIdx].name = data.name || username;
-        state.savedMembers[memberIdx].avatar = data.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg';
-        saveMembersToStorage();
+        state.groupMembers[memberIdx].name = data.name || username;
+        state.groupMembers[memberIdx].avatar = data.avatar || 'https://assets.leetcode.com/users/default_avatar.jpg';
       }
 
       renderDashboard(data);
-      renderSidebarMembers();
       showContent();
 
     } catch (err) {
@@ -437,15 +951,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   fetchDailyQuestion();
 
-  function renderDashboard(data) {
-    document.getElementById('header-user-avatar').src = data.avatar;
-    document.getElementById('header-user-name').textContent = data.name;
-    document.getElementById('header-user-handle').textContent = `@${data.username}`;
-
+  function renderHeaderUserProfile(data) {
+    if (!data) return;
+    const headerAvatar = document.getElementById('header-user-avatar');
+    const headerName = document.getElementById('header-user-name');
+    const headerHandle = document.getElementById('header-user-handle');
     const headerUserLink = document.getElementById('header-user-link');
+
+    if (headerAvatar) headerAvatar.src = data.avatar;
+    if (headerName) headerName.textContent = data.name;
+    if (headerHandle) headerHandle.textContent = `@${data.username}`;
     if (headerUserLink) {
       headerUserLink.href = `https://leetcode.com/u/${data.username}/`;
       headerUserLink.target = '_blank';
+      headerUserLink.title = 'Open LeetCode Profile in New Tab';
+    }
+  }
+
+  function renderDashboard(data) {
+    if (!state.authUser) {
+      renderHeaderUserProfile(data);
     }
 
     const stats = data.stats;
@@ -734,6 +1259,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('daily-track-cards-container');
     if (!container) return;
 
+    if (!state.activeGroup || state.groupMembers.length === 0) {
+      const isAuth = !!state.authUser;
+      container.innerHTML = `
+        <div class="empty-group-box">
+          <i data-lucide="users" style="width: 48px; height: 48px; color: var(--primary-green);"></i>
+          <h3>${isAuth ? 'No Group Members' : 'Sign in to View Group Daily Track'}</h3>
+          <p>${isAuth ? 'Create a group or join with an invite code to start tracking daily solved problems with your teammates.' : 'Sign in with Google to create or join a group and track daily LeetCode progress group-wise.'}</p>
+          <div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content: center;">
+            ${isAuth ? `
+              <button class="btn-primary-green" onclick="document.getElementById('btn-create-group')?.click()"><i data-lucide="users-round"></i> Create Group</button>
+              <button class="btn-secondary-outline" onclick="document.getElementById('btn-join-group')?.click()"><i data-lucide="user-plus"></i> Join Group</button>
+            ` : `
+              <button class="btn-primary-green" onclick="document.getElementById('btn-login-google')?.click()"><i data-lucide="log-in"></i> Sign in with Google</button>
+            `}
+          </div>
+        </div>
+      `;
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
+
     const selectEl = document.getElementById('daily-track-date-select');
     const chosenDateKey = targetDateKey || (selectEl ? selectEl.value : null) || formatLocalDateKey(new Date());
 
@@ -751,7 +1297,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="daily-shimmer-card"></div>
     `;
 
-    const fetchPromises = state.savedMembers.map(async (member) => {
+    const fetchPromises = state.groupMembers.map(async (member) => {
       if (!member || !member.username) return;
       const username = member.username;
       try {
@@ -766,11 +1312,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     await Promise.all(fetchPromises);
-    saveMembersToStorage();
 
     container.innerHTML = '';
 
-    state.savedMembers.forEach(member => {
+    state.groupMembers.forEach(member => {
       if (!member || !member.username) return;
       const data = state.teamData[member.username];
       const allSubmissions = data?.recentSubmissions || [];
@@ -814,7 +1359,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       card.innerHTML = `
-        <div class="daily-card-header">
+        <div class="daily-card-header" style="cursor: pointer;">
           <div class="daily-member-info">
             <img src="${avatarUrl}" alt="${displayName}" class="daily-member-avatar" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
             <div>
@@ -829,6 +1374,12 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
+      card.querySelector('.daily-card-header').addEventListener('click', () => {
+        usernameInput.value = member.username;
+        loadUserData(member.username);
+        switchView('single');
+      });
+
       container.appendChild(card);
     });
 
@@ -839,6 +1390,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('warnings-cards-container');
     if (!container) return;
 
+    if (!state.activeGroup || state.groupMembers.length === 0) {
+      const isAuth = !!state.authUser;
+      container.innerHTML = `
+        <div class="empty-group-box">
+          <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: #f59e0b;"></i>
+          <h3>${isAuth ? 'No Group Warnings' : 'Sign in to View Group Warnings'}</h3>
+          <p>${isAuth ? 'Create or join a group to track daily problem solving compliance across group members.' : 'Sign in with Google to monitor inactivity warnings across group members.'}</p>
+        </div>
+      `;
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
+
     container.innerHTML = `
       <div class="daily-shimmer-card"></div>
       <div class="daily-shimmer-card"></div>
@@ -846,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="daily-shimmer-card"></div>
     `;
 
-    const fetchPromises = state.savedMembers.map(async (member) => {
+    const fetchPromises = state.groupMembers.map(async (member) => {
       if (!member || !member.username) return;
       const username = member.username;
       try {
@@ -861,7 +1425,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     await Promise.all(fetchPromises);
-    saveMembersToStorage();
 
     container.innerHTML = '';
 
@@ -875,7 +1438,7 @@ document.addEventListener('DOMContentLoaded', () => {
       cur.setUTCDate(cur.getUTCDate() + 1);
     }
 
-    state.savedMembers.forEach(member => {
+    state.groupMembers.forEach(member => {
       if (!member || !member.username) return;
       const data = state.teamData[member.username];
       const parsedCalendar = parseSubmissionCalendar(data?.submissionCalendar);
@@ -928,7 +1491,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       card.innerHTML = `
-        <div class="daily-card-header">
+        <div class="daily-card-header" style="cursor: pointer;">
           <div class="daily-member-info">
             <img src="${avatarUrl}" alt="${displayName}" class="daily-member-avatar" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
             <div>
@@ -946,6 +1509,12 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
+      card.querySelector('.daily-card-header').addEventListener('click', () => {
+        usernameInput.value = member.username;
+        loadUserData(member.username);
+        switchView('single');
+      });
+
       container.appendChild(card);
     });
 
@@ -957,6 +1526,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const dailyChartEl = document.getElementById('team-daily-bar-chart');
     const weeklyChartEl = document.getElementById('team-weekly-bar-chart');
     const monthlyChartEl = document.getElementById('team-monthly-bar-chart');
+
+    if (!state.activeGroup || state.groupMembers.length === 0) {
+      const isAuth = !!state.authUser;
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" style="text-align: center; padding: 48px 20px;">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                <i data-lucide="trophy" style="width: 40px; height: 40px; color: var(--text-light);"></i>
+                <div style="font-weight: 700; color: var(--text-dark);">${isAuth ? 'No Group Selected' : 'Sign in to View Group Leaderboard'}</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); max-width: 380px;">${isAuth ? 'Select, create, or join a group to compare rankings.' : 'Sign in to view comprehensive group leaderboard rankings.'}</div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+      if (dailyChartEl) dailyChartEl.innerHTML = `<div style="text-align: center; padding: 40px 0; color: var(--text-light); font-size: 0.85rem;">No group data</div>`;
+      if (weeklyChartEl) weeklyChartEl.innerHTML = `<div style="text-align: center; padding: 40px 0; color: var(--text-light); font-size: 0.85rem;">No group data</div>`;
+      if (monthlyChartEl) monthlyChartEl.innerHTML = `<div style="text-align: center; padding: 40px 0; color: var(--text-light); font-size: 0.85rem;">No group data</div>`;
+      if (window.lucide) window.lucide.createIcons();
+      return;
+    }
 
     if (tbody) {
       tbody.innerHTML = `
@@ -971,7 +1562,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (weeklyChartEl) weeklyChartEl.innerHTML = `<div class="daily-shimmer-card" style="height: 140px;"></div>`;
     if (monthlyChartEl) monthlyChartEl.innerHTML = `<div class="daily-shimmer-card" style="height: 140px;"></div>`;
 
-    const fetchPromises = state.savedMembers.map(async (member) => {
+    const fetchPromises = state.groupMembers.map(async (member) => {
       if (!member || !member.username) return;
       const username = member.username;
       if (!state.teamData[username]) {
@@ -988,9 +1579,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     await Promise.all(fetchPromises);
-    saveMembersToStorage();
 
-    const teamList = state.savedMembers
+    const teamList = state.groupMembers
       .map(m => m && state.teamData[m.username])
       .filter(Boolean)
       .sort((a, b) => b.stats.totalSolved - a.stats.totalSolved);
@@ -1002,7 +1592,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.innerHTML = `
           <td><span class="rank-badge rank-${index + 1}">${index + 1}</span></td>
           <td>
-            <div class="user-cell">
+            <div class="user-cell" style="cursor: pointer;">
               <img src="${member.avatar}" alt="${member.username}" onerror="this.src='https://assets.leetcode.com/users/default_avatar.jpg'">
               <div>
                 <div><strong>${member.name}</strong></div>
@@ -1020,6 +1610,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="btn-pill-small btn-inspect" data-username="${member.username}">Inspect Profile</button>
           </td>
         `;
+
+        tr.querySelector('.user-cell').addEventListener('click', () => {
+          usernameInput.value = member.username;
+          loadUserData(member.username);
+          switchView('single');
+        });
 
         tr.querySelector('.btn-inspect').addEventListener('click', () => {
           usernameInput.value = member.username;
